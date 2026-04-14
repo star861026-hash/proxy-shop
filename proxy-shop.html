@@ -42,8 +42,8 @@ input:focus,select:focus,textarea:focus{border-color:#4a9fd4!important;box-shado
 const {useState,useEffect,useCallback,useRef} = React;
 
 // ── 設定（可修改）─────────────────────────────
-const AGENT_EMAIL    = "admin@shop.com";
-const AGENT_PASSWORD = "shop1234";
+const AGENT_EMAIL    = "star861026@gmail.com";
+const AGENT_PASSWORD = "Chi354126-";
 // ─────────────────────────────────────────────
 
 const CURRENCIES = ["TWD","JPY","USD","KRW","HKD","EUR"];
@@ -187,7 +187,7 @@ function ClientView({orders,setOrders,clients,products,sellRates,onBack}){
   const cartTotal= cart.reduce((s,i)=>s+toTWD(i.product.price*i.qty,i.product.currency,sellRates),0);
   const visible  = products.filter(p=>cat==="全部"||p.category===cat);
 
-  function lookup(){const f=clients.find(c=>c.name.trim()===inp.trim());if(!f){showToast("找不到此群組暱稱","error");return;}setNick(inp.trim());setCart([]);}
+  function lookup()(){if(!inp.trim()){showToast("請輸入名字","error");return;} const f=clients.find(c=>c.name.trim()===inp.trim()); if(!f){const code="C"+Date.now().toString().slice(-4); setClients(p=>[...p,{clientCode:code,name:inp.trim()}]);} setNick(inp.trim()); setCart([]);}
 
   function addToCart(product,qty,note,image=null){
     setCart(prev=>{
