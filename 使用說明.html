@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ShopTrack 使用說明</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',sans-serif;background:#fdf6ee;color:#2d1f1a;min-height:100vh}
+
+/* Hero */
+.hero{background:linear-gradient(135deg,#e8a898,#c8756a);padding:40px 24px 60px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;top:-40px;right:-40px;width:200px;height:200px;background:rgba(255,255,255,.08);border-radius:50%}
+.hero::after{content:"";position:absolute;bottom:-60px;left:-30px;width:160px;height:160px;background:rgba(255,255,255,.06);border-radius:50%}
+.hero-emoji{font-size:64px;display:block;margin-bottom:12px;animation:float 3s ease-in-out infinite}
+.hero h1{font-size:28px;font-weight:900;color:#fff;margin-bottom:8px}
+.hero p{font-size:14px;color:rgba(255,255,255,.85);font-weight:500}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* Step cards */
+.steps{padding:0 16px;margin-top:-24px}
+.step-card{background:#fffdf8;border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:0 4px 20px rgba(180,120,80,.1);position:relative;overflow:hidden}
+.step-card::before{content:"";position:absolute;top:0;left:0;width:4px;height:100%;background:linear-gradient(135deg,#c8756a,#e0957a);border-radius:4px 0 0 4px}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;background:linear-gradient(135deg,#c8756a,#e0957a);color:#fff;font-weight:900;font-size:15px;border-radius:10px;margin-bottom:12px}
+.step-title{font-size:17px;font-weight:900;color:#2d1f1a;margin-bottom:6px}
+.step-desc{font-size:13px;color:#8a6a5a;line-height:1.7;margin-bottom:14px}
+
+/* Mock phone screen */
+.phone{background:#fff;border-radius:18px;border:2px solid #f0d9cc;overflow:hidden;margin-bottom:4px;box-shadow:0 4px 16px rgba(180,120,80,.12)}
+.phone-bar{background:linear-gradient(135deg,#e8a898,#c8756a);padding:10px 14px;display:flex;align-items:center;gap:8px}
+.phone-bar span{color:#fff;font-size:12px;font-weight:700}
+.phone-dot{width:8px;height:8px;background:rgba(255,255,255,.6);border-radius:50%}
+.phone-body{padding:14px}
+
+/* UI mock elements */
+.mock-btn{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#c8756a,#e0957a);color:#fff;border-radius:12px;padding:8px 16px;font-size:12px;font-weight:800;margin:4px 0}
+.mock-btn-outline{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#c8756a;border:1.5px solid #f0d9cc;border-radius:12px;padding:8px 16px;font-size:12px;font-weight:800;margin:4px 0}
+.mock-input{background:#fff8f0;border:1.5px solid #f0d9cc;border-radius:10px;padding:8px 12px;font-size:12px;color:#8a6a5a;width:100%;margin:4px 0}
+.mock-card{background:#fff8f0;border-radius:12px;padding:10px 12px;margin:6px 0;border:1px solid #f0d9cc}
+.mock-tag{display:inline-flex;align-items:center;background:#f0fdf4;color:#22c55e;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:800}
+.mock-tag-blue{background:#fff8f0;color:#c8756a}
+.mock-tabs{display:flex;gap:4px;background:#fffaf5;border-radius:12px;padding:4px;margin-bottom:10px}
+.mock-tab{flex:1;text-align:center;padding:6px 4px;border-radius:9px;font-size:10px;font-weight:800;color:#b8887a}
+.mock-tab.active{background:linear-gradient(135deg,#c8756a,#e0957a);color:#fff}
+.mock-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.mock-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.badge{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:800}
+
+/* Tips */
+.tip{background:linear-gradient(135deg,#fff8ee,#fde8c0);border:1.5px solid #f0c070;border-radius:14px;padding:12px 16px;margin:8px 0;font-size:12px;color:#7a4a22;font-weight:600;line-height:1.6}
+.tip-title{font-weight:900;font-size:13px;margin-bottom:4px}
+
+/* Member levels */
+.level-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0d9cc}
+.level-row:last-child{border-bottom:none}
+.level-icon{font-size:22px;width:36px;text-align:center}
+.level-info{flex:1}
+.level-name{font-weight:800;font-size:13px;color:#2d1f1a}
+.level-desc{font-size:11px;color:#8a6a5a;margin-top:1px}
+.level-badge{font-size:11px;font-weight:800;padding:2px 8px;border-radius:8px}
+
+/* Footer */
+.footer{background:linear-gradient(135deg,#e8a898,#c8756a);padding:32px 24px;text-align:center;margin-top:8px}
+.footer h3{color:#fff;font-size:18px;font-weight:900;margin-bottom:8px}
+.footer p{color:rgba(255,255,255,.85);font-size:13px;line-height:1.7}
+.url-box{background:rgba(255,255,255,.2);border-radius:12px;padding:10px 16px;margin-top:12px;font-size:13px;color:#fff;font-weight:700;word-break:break-all}
+
+/* Section title */
+.section-title{font-size:11px;font-weight:800;color:#c8756a;letter-spacing:2px;margin:24px 16px 12px;text-transform:uppercase}
+
+.divider{height:1px;background:linear-gradient(90deg,transparent,#f0d9cc,transparent);margin:8px 16px}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <span class="hero-emoji">🛍️</span>
+  <h1>ShopTrack 使用說明</h1>
+  <p>日本代購點單系統・簡單三步驟就能下單</p>
+</div>
+
+<!-- Steps -->
+<div class="steps">
+
+  <!-- Step 1 -->
+  <div class="step-card" style="margin-top:0">
+    <div class="step-num">1</div>
+    <div class="step-title">開啟網站，輸入你的暱稱</div>
+    <div class="step-desc">點下方連結開啟網站，在「客人點單 / 查詢」頁面輸入你在群組的暱稱（由業者提供），即可進入專屬頁面。</div>
+    <div class="phone">
+      <div class="phone-bar"><div class="phone-dot"></div><span>ShopTrack</span></div>
+      <div class="phone-body">
+        <div style="text-align:center;padding:12px 0">
+          <div style="font-size:36px;margin-bottom:8px">🛍️</div>
+          <div style="font-weight:900;font-size:18px;color:#2d1f1a;margin-bottom:4px">ShopTrack</div>
+          <div style="font-size:11px;color:#b8887a">日本代購管理系統</div>
+        </div>
+        <div class="mock-btn" style="width:100%;justify-content:space-between;margin-bottom:8px">
+          <span>👤 客人點單 / 查詢</span><span>→</span>
+        </div>
+        <div class="mock-btn-outline" style="width:100%;justify-content:space-between">
+          <span>👑 闆闆登入</span><span>→</span>
+        </div>
+      </div>
+    </div>
+    <div class="tip">
+      <div class="tip-title">💡 小提示</div>
+      暱稱是由業者在後台幫你建立的，如果輸入後無法進入，請聯絡業者確認你的暱稱！
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-title">瀏覽商品，加入購物車</div>
+    <div class="step-desc">進入後有四個分頁，可以在「🏪 現貨」或「🛒 目錄」選購商品，點商品後選數量、填備註，加入購物車。</div>
+    <div class="phone">
+      <div class="phone-bar"><div class="phone-dot"></div><span>客人點單專區</span></div>
+      <div class="phone-body">
+        <div class="mock-tabs">
+          <div class="mock-tab active">🏪 現貨</div>
+          <div class="mock-tab">🛒 目錄</div>
+          <div class="mock-tab">📋 訂單</div>
+          <div class="mock-tab">⭐ 許願</div>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:8px 10px;font-size:11px;color:#166534;font-weight:700;margin-bottom:8px">
+          🏪 以下商品已在台灣，可直接購買！
+        </div>
+        <div class="mock-card" style="display:flex;gap:8px;align-items:center">
+          <div style="width:48px;height:48px;background:#fff8f0;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🎀</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:800;color:#2d1f1a">Hello Kitty 扭蛋 草莓款</div>
+            <div style="font-size:11px;color:#22c55e;font-weight:700">NT$350</div>
+          </div>
+          <span class="mock-tag">現貨</span>
+        </div>
+        <div class="mock-card" style="display:flex;gap:8px;align-items:center">
+          <div style="width:48px;height:48px;background:#fff8f0;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">💄</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:800;color:#2d1f1a">資生堂防曬乳 SPF50</div>
+            <div style="font-size:11px;color:#b5622e;font-weight:700">¥2,800 ≈ NT$728</div>
+          </div>
+          <span class="mock-tag mock-tag-blue">代購</span>
+        </div>
+      </div>
+    </div>
+    <div class="tip">
+      <div class="tip-title">🛒 購物車小技巧</div>
+      現貨和代購商品可以<b>混合下單</b>，一起送出更方便！點商品可以填備註，例如顏色、尺寸等。
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-title">送出訂單，追蹤進度</div>
+    <div class="step-desc">確認購物車後點「確認送出需求」，訂單會出現在「📋 我的訂單」分頁，可以隨時查看最新狀態！</div>
+    <div class="phone">
+      <div class="phone-bar"><div class="phone-dot"></div><span>我的訂單</span></div>
+      <div class="phone-body">
+        <div class="mock-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:800;font-size:13px;color:#2d1f1a">Nike Air Max 2024</div>
+            <span class="badge" style="background:#fef9ec;color:#f59e0b">⏳ 待購買</span>
+          </div>
+          <!-- Progress bar -->
+          <div style="display:flex;align-items:center;margin-bottom:8px">
+            <div style="width:20px;height:20px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:900">✓</div>
+            <div style="flex:1;height:3px;background:#e8f4fb;margin:0 3px"></div>
+            <div style="width:20px;height:20px;border-radius:50%;background:#e8f4fb"></div>
+            <div style="flex:1;height:3px;background:#e8f4fb;margin:0 3px"></div>
+            <div style="width:20px;height:20px;border-radius:50%;background:#e8f4fb"></div>
+            <div style="flex:1;height:3px;background:#e8f4fb;margin:0 3px"></div>
+            <div style="width:20px;height:20px;border-radius:50%;background:#e8f4fb"></div>
+          </div>
+          <div style="font-size:11px;color:#b8887a">JPY 12,000 ≈ NT$3,120 · 備註：白色 25cm</div>
+        </div>
+        <div class="mock-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-weight:800;font-size:13px;color:#2d1f1a">資生堂防曬乳</div>
+            <span class="badge" style="background:#f0fdf4;color:#22c55e">✅ 已買到</span>
+          </div>
+          <div style="font-size:11px;color:#b8887a">JPY 2,800 ≈ NT$728</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status legend -->
+    <div style="margin-top:12px">
+      <div style="font-size:11px;font-weight:800;color:#8a6a5a;margin-bottom:8px">📌 訂單狀態說明</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div style="background:#fef9ec;border-radius:10px;padding:8px 10px">
+          <div style="font-size:13px;margin-bottom:2px">⏳ 待購買</div>
+          <div style="font-size:10px;color:#8a6a5a">業者收到需求，準備購買</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:10px;padding:8px 10px">
+          <div style="font-size:13px;margin-bottom:2px">✅ 已買到</div>
+          <div style="font-size:10px;color:#8a6a5a">商品已在日本買到</div>
+        </div>
+        <div style="background:#eff6ff;border-radius:10px;padding:8px 10px">
+          <div style="font-size:13px;margin-bottom:2px">🚚 已寄出</div>
+          <div style="font-size:10px;color:#8a6a5a">從日本寄回台灣中</div>
+        </div>
+        <div style="background:#f5f3ff;border-radius:10px;padding:8px 10px">
+          <div style="font-size:13px;margin-bottom:2px">📦 已到台灣</div>
+          <div style="font-size:10px;color:#8a6a5a">已回台，準備交付</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bonus: Wishlist -->
+  <div class="step-card">
+    <div class="step-num" style="background:linear-gradient(135deg,#a855f7,#9333ea)">⭐</div>
+    <div class="step-title">找不到商品？許願給業者！</div>
+    <div class="step-desc">在「⭐ 許願」分頁可以新增想找的商品，可以附上截圖，業者看到後會幫你留意！</div>
+    <div class="phone">
+      <div class="phone-bar" style="background:linear-gradient(135deg,#a855f7,#9333ea)"><div class="phone-dot"></div><span>許願清單</span></div>
+      <div class="phone-body">
+        <div style="background:linear-gradient(135deg,#fdf4ff,#fae8ff);border:1.5px solid #e9d5ff;border-radius:12px;padding:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div style="font-weight:800;color:#7e22ce;font-size:13px">⭐ 許願清單</div>
+            <div style="font-size:11px;color:#a855f7">許願後業者會幫你留意！</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#a855f7,#9333ea);color:#fff;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:800">＋ 許願</div>
+        </div>
+        <div class="mock-card" style="border-color:#e9d5ff">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-weight:800;font-size:13px;color:#2d1f1a">限定版茶杯組</div>
+              <div style="font-size:11px;color:#b8887a;margin-top:2px">📝 京都限定款</div>
+            </div>
+            <span class="badge" style="background:#fdf4ff;color:#a855f7;font-size:10px">⭐ 許願中</span>
+          </div>
+        </div>
+        <div class="mock-card" style="border-color:#e9d5ff">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-weight:800;font-size:13px;color:#2d1f1a">Sanrio 扭蛋 新款</div>
+            </div>
+            <span class="badge" style="background:#f0fdf4;color:#22c55e;font-size:10px">✅ 找到了</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bonus: Wallet & Member -->
+  <div class="step-card">
+    <div class="step-num" style="background:linear-gradient(135deg,#f59e0b,#fbbf24)">💰</div>
+    <div class="step-title">購物金 & 會員等級</div>
+    <div class="step-desc">在「💰 購物金」分頁可以查看餘額、交易明細，以及你目前的會員等級和專屬折扣！</div>
+
+    <!-- Member levels -->
+    <div style="background:#fffdf8;border-radius:14px;padding:14px;border:1px solid #f0d9cc;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:800;color:#8a6a5a;margin-bottom:10px">✨ 儲值越多，等級越高，優惠越大！</div>
+      <div class="level-row">
+        <div class="level-icon">💎</div>
+        <div class="level-info">
+          <div class="level-name">鑽石會員</div>
+          <div class="level-desc">儲值 NT$6,000+・土產 0.26・門票 0.27・回饋 2%</div>
+        </div>
+        <span class="level-badge" style="background:#eff6ff;color:#60a5fa">最高</span>
+      </div>
+      <div class="level-row">
+        <div class="level-icon">🥇</div>
+        <div class="level-info">
+          <div class="level-name">黃金會員</div>
+          <div class="level-desc">儲值 NT$4,000+・門票 0.27・回饋 1%・送禮物</div>
+        </div>
+        <span class="level-badge" style="background:#fef9ec;color:#f59e0b">推薦</span>
+      </div>
+      <div class="level-row">
+        <div class="level-icon">🥈</div>
+        <div class="level-info">
+          <div class="level-name">白銀會員</div>
+          <div class="level-desc">儲值 NT$2,000+・回饋 1%</div>
+        </div>
+        <span class="level-badge" style="background:#f0f0f0;color:#8a6a5a">入門</span>
+      </div>
+    </div>
+
+    <div class="tip">
+      <div class="tip-title">🚚 免運優惠</div>
+      有儲值的朋友本次連線享有<b>免運</b>！未儲值但單次消費滿 NT$3,000 也享免運 🎉
+    </div>
+    <div class="tip">
+      <div class="tip-title">🎟️ 抽獎活動</div>
+      每消費滿 NT$888 送抽獎券 1 張，越買越多券！
+    </div>
+  </div>
+
+  <!-- Gacha pricing -->
+  <div class="step-card">
+    <div class="step-num" style="background:linear-gradient(135deg,#a855f7,#9333ea)">🎰</div>
+    <div class="step-title">扭蛋優惠定價</div>
+    <div class="step-desc">所有人都享有扭蛋連線優惠價，不留蛋殼，只留蛋紙（留蛋殼另加 NT$5）：</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:linear-gradient(135deg,#fdf4ff,#f5e8ff);border-radius:14px;padding:14px;text-align:center;border:1.5px solid #e9d5ff">
+        <div style="font-size:20px;font-weight:900;color:#7e22ce">200¥</div>
+        <div style="font-size:24px;font-weight:900;color:#2d1f1a;margin:4px 0">NT$60</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#fdf4ff,#f5e8ff);border-radius:14px;padding:14px;text-align:center;border:1.5px solid #e9d5ff">
+        <div style="font-size:20px;font-weight:900;color:#7e22ce">300¥</div>
+        <div style="font-size:24px;font-weight:900;color:#2d1f1a;margin:4px 0">NT$80</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#fdf4ff,#f5e8ff);border-radius:14px;padding:14px;text-align:center;border:1.5px solid #e9d5ff">
+        <div style="font-size:20px;font-weight:900;color:#7e22ce">400¥</div>
+        <div style="font-size:24px;font-weight:900;color:#2d1f1a;margin:4px 0">NT$110</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#fdf4ff,#f5e8ff);border-radius:14px;padding:14px;text-align:center;border:1.5px solid #e9d5ff">
+        <div style="font-size:20px;font-weight:900;color:#7e22ce">500¥</div>
+        <div style="font-size:24px;font-weight:900;color:#2d1f1a;margin:4px 0">NT$140</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual order -->
+  <div class="step-card">
+    <div class="step-num" style="background:linear-gradient(135deg,#64748b,#94a3b8)">✍️</div>
+    <div class="step-title">商品目錄找不到？手動輸入！</div>
+    <div class="step-desc">在「🛒 目錄」分頁拉到最下面，點「找不到商品？手動輸入」，可以自己填寫商品名稱、日幣金額，還可以上傳截圖給業者看！</div>
+    <div class="phone">
+      <div class="phone-bar"><div class="phone-dot"></div><span>手動輸入需求</span></div>
+      <div class="phone-body">
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:800;color:#b8887a;margin-bottom:4px">商品名稱 *</div>
+          <div class="mock-input">Nike Air Force 1 黑色</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="flex:2">
+            <div style="font-size:10px;font-weight:800;color:#b8887a;margin-bottom:4px">價格 *</div>
+            <div class="mock-input">12000</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;font-weight:800;color:#b8887a;margin-bottom:4px">幣別</div>
+            <div class="mock-input" style="color:#c8756a;font-weight:700">JPY</div>
+          </div>
+        </div>
+        <div style="background:#fff8ee;border-radius:10px;padding:8px 10px;font-size:11px;color:#b5622e;font-weight:700">
+          💱 約 NT$3,120
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <h3>🛍️ 開始購物！</h3>
+  <p>把這個網址收藏起來<br/>隨時都能查詢訂單和點單 😊</p>
+  <div class="url-box">https://star861026-hash.github.io/proxy-shop/proxy-shop.html</div>
+  <p style="margin-top:12px;font-size:12px;opacity:.8">有任何問題請聯絡業者 ✨</p>
+</div>
+
+</body>
+</html>
