@@ -1,0 +1,2652 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>ShopTrack 代購管理系統</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet"/>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAg0FvM_1Qpe6ZPKqLZiHzwUvMHa4C6kSI",
+  authDomain: "shoptrack-76f27.firebaseapp.com",
+  projectId: "shoptrack-76f27",
+  storageBucket: "shoptrack-76f27.firebasestorage.app",
+  messagingSenderId: "667169063056",
+  appId: "1:667169063056:web:5f5e69c1af41ac92e15815"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',sans-serif;background:linear-gradient(160deg,#fdf6ee,#fff8f0,#fef3e8);min-height:100vh}
+.card{background:#fffdf8;border-radius:18px;box-shadow:0 2px 16px rgba(180,120,80,.08)}
+.tap{cursor:pointer;transition:transform .1s,opacity .1s}
+.tap:active{transform:scale(.97);opacity:.85}
+.tab-btn{border:none;background:none;cursor:pointer;padding:10px 0;font-size:13px;font-weight:700;color:#c8a090;position:relative;white-space:nowrap;font-family:inherit}
+.tab-btn.active{color:#c8756a}
+.tab-btn.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2.5px;background:#c8756a;border-radius:2px}
+.gold{color:#b5622e;font-weight:800}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:800}
+input,select,textarea{font-family:inherit;outline:none;box-sizing:border-box}
+input:focus,select:focus,textarea:focus{border-color:#c8756a!important;box-shadow:0 0 0 3px rgba(200,117,106,.12)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:translateY(0)}}
+.modal-overlay{position:fixed;inset:0;background:rgba(80,40,20,.2);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:flex-end;justify-content:center}
+.modal-box{background:#fff;border-radius:24px 24px 0 0;padding:20px 20px 40px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(150,80,50,.12);animation:slideUp .3s ease}
+.modal-handle{width:40px;height:4px;background:#f0d9cc;border-radius:4px;margin:0 auto 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.IS{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid #f0d9cc;font-size:14px;color:#2d1f1a;font-family:inherit}
+.LS{font-size:12px;font-weight:800;color:#b8887a;display:block;margin-bottom:6px}
+.btn-blue{padding:13px;border-radius:14px;border:none;background:linear-gradient(135deg,#c8756a,#e0957a);color:#fff;font-weight:900;cursor:pointer;font-size:14px;font-family:inherit;box-shadow:0 4px 14px rgba(200,117,106,.3)}
+.btn-gray{padding:13px;border-radius:14px;border:1.5px solid #f0d9cc;background:#fffaf5;font-weight:700;cursor:pointer;font-size:14px;color:#b8887a;font-family:inherit}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef} = React;
+
+// ══ 設定區（可修改）══════════════════════════
+const AGENT_EMAIL    = "star861026@gmail.com";
+const AGENT_PASSWORD = "Chi354126-";
+const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1493585128687927376/6qalfl7CT1y6OJQoW_Y80Dr65Vy1toF9hu4-B9iTHbGgT9dMCj6T-UL1dk_Jqv9QmfCE";
+// ════════════════════════════════════════════
+
+const CURRENCIES = ["TWD","JPY","USD","KRW","HKD","EUR"];
+const BASE_RATES  = {TWD:1,JPY:0.2022,USD:31.46,KRW:0.024,HKD:4.1,EUR:36.94};
+const SELL_RATES0 = {TWD:1,JPY:0.26,USD:34.0,KRW:0.027,HKD:4.5,EUR:37.0};
+
+const RATE_TYPES = {
+  general: {label:"一般商品",   rate:0.26, color:"#c8756a"},
+  ticket:  {label:"需門票商品", rate:0.28, color:"#f59e0b"},
+  souvenir:{label:"土產/大型",  rate:0.27, color:"#22c55e"},
+  gacha:   {label:"扭蛋",       rate:null, color:"#a855f7"},
+  group:   {label:"大項目代購", rate:null, color:"#e11d48"},
+};
+
+const GACHA_PRICES = [
+  {jpy:200,twd:60},{jpy:300,twd:80},{jpy:400,twd:110},{jpy:500,twd:140}
+];
+function gachaTWD(jpy,keepShell){
+  const r=GACHA_PRICES.find(x=>x.jpy===+jpy);
+  return (r?r.twd:Math.round(+jpy*0.26))+(keepShell?5:0);
+}
+
+const MEMBER_LEVELS = [
+  {name:"鑽石會員",minDeposit:6000,cashback:0.02,ticketRate:0.27,souvenirRate:0.26,gift:true, color:"#c8756a",icon:"💎"},
+  {name:"黃金會員",minDeposit:4000,cashback:0.01,ticketRate:0.27,souvenirRate:0.27,gift:true, color:"#f59e0b",icon:"🥇"},
+  {name:"白銀會員",minDeposit:2000,cashback:0.01,ticketRate:0.28,souvenirRate:0.27,gift:false,color:"#b8887a",icon:"🥈"},
+  {name:"一般會員",minDeposit:0,   cashback:0,   ticketRate:0.28,souvenirRate:0.27,gift:false,color:"#d4a898",icon:"👤"},
+];
+function getMemberLevel(dep){return MEMBER_LEVELS.find(l=>dep>=l.minDeposit)||MEMBER_LEVELS[3];}
+function getLotteryTickets(spent){return Math.floor(spent/888);}
+
+const STATUS = {
+  pending_review:{label:"待審核",  color:"#e11d48",bg:"#fff1f1",icon:"🔍"},
+  pending:       {label:"待購買",  color:"#f59e0b",bg:"#fff8ee",icon:"⏳"},
+  bought:        {label:"已買到",  color:"#22c55e",bg:"#f0fdf4",icon:"✅"},
+  shipped:       {label:"已寄出",  color:"#c8756a",bg:"#eff6ff",icon:"🚚"},
+  arrived:       {label:"已到台灣",color:"#a78bfa",bg:"#f5f3ff",icon:"📦"},
+  cancelled:     {label:"已取消",  color:"#94a3b8",bg:"#f1f5f9",icon:"❌"},
+};
+const CATS=["全部","美妝保養","服飾鞋包","食品零食","生活用品","電子產品","扭蛋","其他"];
+const CAT_ICON={"美妝保養":"💄","服飾鞋包":"👟","食品零食":"🍬","生活用品":"🏠","電子產品":"📱","扭蛋":"🎰","其他":"📦"};
+
+function toTWD(a,c,r){return Math.ceil(a*(r[c]||1));}
+function productTWD(p,sr){
+  if(p.customRate) return Math.ceil(p.price*p.customRate);
+  if(p.rateType==="gacha") return gachaTWD(p.price,p.keepShell);
+  if(p.rateType==="group") return Math.ceil(p.price*(RATE_TYPES[p.groupRateType||"general"]?.rate||0.26));
+  if(p.rateType&&RATE_TYPES[p.rateType]&&RATE_TYPES[p.rateType].rate) return Math.ceil(p.price*RATE_TYPES[p.rateType].rate);
+  return toTWD(p.price,p.currency,sr);
+}
+
+// localStorage
+const LSK=k=>`shoptrack_${k}`;
+function load(k,d){try{const v=localStorage.getItem(LSK(k));return v?JSON.parse(v):d;}catch{return d;}}
+function save(k,v){
+  try{
+    localStorage.setItem(LSK(k),JSON.stringify(v));
+  }catch(e){
+    if(e.name==="QuotaExceededError"||e.code===22||e.name==="NS_ERROR_DOM_QUOTA_REACHED"){
+      try{
+        // 清除訂單圖片釋放空間
+        const orders=JSON.parse(localStorage.getItem(LSK("orders"))||"[]");
+        localStorage.setItem(LSK("orders"),JSON.stringify(orders.map(o=>({...o,image:null}))));
+        // 再試一次
+        localStorage.setItem(LSK(k),JSON.stringify(v));
+        alert("⚠️ 儲存空間快滿了！已自動清除訂單圖片。建議定期清除舊訂單。");
+      }catch(e2){
+        alert("❌ 儲存失敗！空間已滿，請至電腦瀏覽器清除舊資料後再試。");
+      }
+    }
+  }
+}
+
+// Discord
+async function notifyDiscord(msg){
+  try{await fetch(DISCORD_WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({content:msg})});}
+  catch(e){console.log("DC error",e);}
+}
+
+// Shared hooks
+function useToast(){
+  const [t,setT]=useState(null);
+  const show=useCallback((msg,type="success")=>{setT({msg,type});setTimeout(()=>setT(null),2600);},[]);
+  return[t,show];
+}
+// 圖片壓縮：自動縮小到最大 800px 寬，品質 70%，確保不超過 Firebase 限制
+function compressImage(file, maxW=800, quality=0.7){
+  return new Promise(resolve=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement("canvas");
+        let w=img.width, h=img.height;
+        if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+        canvas.width=w; canvas.height=h;
+        canvas.getContext("2d").drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL("image/jpeg",quality));
+      };
+      img.src=ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function useImg(init=null){
+  const [img,setImg]=useState(init);
+  const ref=useRef();
+  function pick(){ref.current?.click();}
+  async function onChange(e){
+    const f=e.target.files?.[0]; if(!f)return;
+    const compressed=await compressImage(f);
+    setImg(compressed);
+    e.target.value="";
+  }
+  return{img,setImg,ref,pick,onChange};
+}
+
+// Shared UI
+function Toast({t}){
+  if(!t)return null;
+  return <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:9999,
+    background:t.type==="error"?"#fff1f1":"#fff8ee",border:`1.5px solid ${t.type==="error"?"#fca5a5":"#f0c070"}`,
+    color:t.type==="error"?"#b91c1c":"#8a4e22",padding:"10px 22px",borderRadius:30,fontWeight:700,fontSize:13,
+    boxShadow:"0 4px 20px rgba(0,0,0,.1)",whiteSpace:"nowrap",animation:"toastIn .25s ease"}}>{t.msg}</div>;
+}
+function ImgBox({img,onPick,iref,onChange,label="點擊上傳圖片",h=140}){
+  return(
+    <div onClick={onPick} className="tap" style={{width:"100%",height:h,borderRadius:14,overflow:"hidden",cursor:"pointer",
+      background:img?"transparent":"#fff8f0",border:`2px dashed ${img?"transparent":"#d4a898"}`,
+      display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+      {img?<img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:12}}/>
+        :<div style={{textAlign:"center",color:"#b8887a"}}><div style={{fontSize:28,marginBottom:6}}>📷</div><div style={{fontSize:12,fontWeight:700}}>{label}</div></div>}
+      {img&&<div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,.45)",borderRadius:8,padding:"4px 10px",fontSize:11,color:"#fff",fontWeight:700}}>更換</div>}
+      <input ref={iref} type="file" accept="image/*" onChange={onChange} style={{display:"none"}}/>
+    </div>
+  );
+}
+
+// ══ HOME ════════════════════════════════════
+function Home({onAgent,onClient,announce}){
+  const [showLevels,setShowLevels]=useState(false);
+  return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#fdf6ee,#fff8f0,#fef3e8)",paddingBottom:40}}>
+
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#e8a898,#c8756a)",padding:"32px 24px 48px",textAlign:"center",borderRadius:"0 0 32px 32px"}}>
+        <div style={{fontSize:56,marginBottom:8}}>🛍️</div>
+        <div style={{fontWeight:900,fontSize:26,color:"#fff",letterSpacing:1}}>ShopTrack</div>
+        <div style={{fontSize:13,color:"rgba(255,255,255,.8)",marginTop:4}}>日本代購管理系統</div>
+      </div>
+
+      <div style={{padding:"0 20px",marginTop:-24}}>
+        {/* Main buttons */}
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:24}}>
+          <button onClick={onClient} className="tap"
+            style={{padding:"18px 20px",borderRadius:20,border:"none",background:"#fffdf8",color:"#2d1f1a",fontWeight:900,fontSize:17,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 4px 20px rgba(180,120,80,.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span>👤 客人點單 / 查詢</span>
+            <span style={{fontSize:20,color:"#c8756a"}}>→</span>
+          </button>
+          <button onClick={onAgent} className="tap"
+            style={{padding:"16px 20px",borderRadius:20,border:"1.5px solid #f0d9cc",background:"transparent",color:"#c8756a",fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span>👑 闆闆登入</span>
+            <span style={{fontSize:18}}>→</span>
+          </button>
+        </div>
+
+        {/* Member level teaser */}
+        <div className="card" style={{marginBottom:16,overflow:"hidden"}}>
+          <div style={{background:"linear-gradient(135deg,#fde8c0,#f5c89a)",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontWeight:900,fontSize:15,color:"#7a4a22"}}>✨ 儲值享專屬優惠</div>
+              <div style={{fontSize:12,color:"#a0622e",marginTop:2}}>點擊查看會員等級福利</div>
+            </div>
+            <button onClick={()=>setShowLevels(p=>!p)} className="tap"
+              style={{background:"#c8756a",border:"none",borderRadius:12,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+              {showLevels?"收起":"查看"}
+            </button>
+          </div>
+
+          {showLevels&&(
+            <div style={{padding:"16px"}}>
+              {/* Free shipping note */}
+              <div style={{background:"#fff8ee",borderRadius:12,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#8a4e22",fontWeight:700,lineHeight:1.7}}>
+                🚚 有儲值 → 本次連線<b>免運</b><br/>
+                🚚 未儲值消費滿 NT$3,000 → 也享<b>免運</b>
+              </div>
+
+              {/* Level cards */}
+              {[...MEMBER_LEVELS].reverse().map((l,i)=>(
+                <div key={l.name} style={{borderRadius:16,overflow:"hidden",marginBottom:10,border:`2px solid ${l.color}33`}}>
+                  <div style={{background:`linear-gradient(135deg,${l.color}22,${l.color}11)`,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontWeight:900,fontSize:16,color:l.color}}>{l.icon} {l.name}</div>
+                    <div style={{fontSize:12,color:l.color,fontWeight:800,background:`${l.color}22`,borderRadius:20,padding:"3px 10px"}}>
+                      {l.minDeposit===0?"無需儲值":`儲值 NT$${l.minDeposit.toLocaleString()}+`}
+                    </div>
+                  </div>
+                  <div style={{padding:"12px 16px",background:"#fffdf8"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:12}}>
+                      <div style={{background:"#fff8f0",borderRadius:8,padding:"6px 10px"}}>
+                        <div style={{color:"#b8887a",marginBottom:2}}>💱 一般匯率</div>
+                        <div style={{fontWeight:900,color:"#2d1f1a",fontSize:14}}>0.26</div>
+                      </div>
+                      <div style={{background:"#fff8f0",borderRadius:8,padding:"6px 10px"}}>
+                        <div style={{color:"#b8887a",marginBottom:2}}>🎫 門票匯率</div>
+                        <div style={{fontWeight:900,color:"#2d1f1a",fontSize:14}}>{l.ticketRate}</div>
+                      </div>
+                      <div style={{background:"#fff8f0",borderRadius:8,padding:"6px 10px"}}>
+                        <div style={{color:"#b8887a",marginBottom:2}}>🍱 土產匯率</div>
+                        <div style={{fontWeight:900,color:"#2d1f1a",fontSize:14}}>{l.souvenirRate}</div>
+                      </div>
+                      <div style={{background:"#fff8f0",borderRadius:8,padding:"6px 10px"}}>
+                        <div style={{color:"#b8887a",marginBottom:2}}>💸 消費回饋</div>
+                        <div style={{fontWeight:900,color:l.cashback>0?"#7cb87a":"#2d1f1a",fontSize:14}}>{l.cashback>0?`${l.cashback*100}%回饋`:"無"}</div>
+                      </div>
+                    </div>
+                    {(l.gift||l.minDeposit===4000||l.minDeposit===6000)&&(
+                      <div style={{marginTop:8,background:"linear-gradient(135deg,#fde8c0,#fdd5b0)",borderRadius:10,padding:"8px 12px",fontSize:12,color:"#7a4a22",fontWeight:700}}>
+                        🎁 儲值送小禮物一份
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Gacha pricing */}
+              <div style={{borderRadius:16,overflow:"hidden",border:"2px solid #e9d5ff33",marginBottom:10}}>
+                <div style={{background:"linear-gradient(135deg,#fdf4ff,#f5e8ff)",padding:"12px 16px"}}>
+                  <div style={{fontWeight:900,fontSize:15,color:"#7e22ce"}}>🎰 扭蛋優惠定價</div>
+                  <div style={{fontSize:12,color:"#a855f7",marginTop:2}}>所有會員適用，不留蛋殼優惠價</div>
+                </div>
+                <div style={{padding:"12px 16px",background:"#fffdf8"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                    {GACHA_PRICES.map(g=>(
+                      <div key={g.jpy} style={{background:"#fff8f0",borderRadius:10,padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{color:"#7e22ce",fontWeight:700,fontSize:13}}>{g.jpy}¥</span>
+                        <span style={{fontWeight:900,color:"#2d1f1a",fontSize:15}}>NT${g.twd}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{marginTop:8,fontSize:11,color:"#b8887a"}}>留蛋殼另加 NT$5，只留蛋紙</div>
+                </div>
+              </div>
+
+              {/* Lottery */}
+              <div style={{background:"linear-gradient(135deg,#fff8ee,#fde8c0)",borderRadius:14,padding:"12px 16px",fontSize:13,color:"#7a4a22",fontWeight:700}}>
+                🎟️ 消費滿 NT$888 送抽獎券 1 張（累贈制）
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Announcement */}
+        <div style={{background:"#fffdf8",borderRadius:18,padding:"14px 18px",boxShadow:"0 2px 12px rgba(180,120,80,.08)"}}>
+          <div style={{fontSize:11,color:"#c8a090",fontWeight:700,marginBottom:4,letterSpacing:1}}>📜 公告</div>
+          <div style={{fontSize:14,fontWeight:800,color:"#2d1f1a"}}>{announce?.title||"歡迎使用代購管理系統"}</div>
+          {announce?.body&&<div style={{fontSize:12,color:"#8a6a5a",marginTop:3,whiteSpace:"pre-line"}}>{announce.body}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══ AGENT LOGIN ══════════════════════════════
+function AgentLogin({onLogin,onBack}){
+  const [em,setEm]=useState("");const [pw,setPw]=useState("");
+  const [showPw,setShowPw]=useState(false);const [err,setErr]=useState("");const [shake,setShake]=useState(false);
+  function doLogin(){
+    if(em.trim()===AGENT_EMAIL&&pw===AGENT_PASSWORD){onLogin();}
+    else{setErr("Email 或密碼錯誤");setShake(true);setTimeout(()=>setShake(false),500);}
+  }
+  return(
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,position:"relative"}}>
+      <button onClick={onBack} style={{position:"absolute",top:20,left:20,background:"none",border:"none",color:"#c8756a",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>← 返回</button>
+      <div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:48}}>👑</div><div style={{fontWeight:900,fontSize:22,color:"#2d1f1a"}}>闆闆登入</div></div>
+      <div className="card" style={{padding:"28px 24px",width:"100%",maxWidth:360,animation:shake?"shake .5s ease":"fadeUp .4s ease"}}>
+        <div style={{marginBottom:14}}><label className="LS">Email</label><input className="IS" value={em} onChange={e=>setEm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLogin()} placeholder="輸入 Email"/></div>
+        <div style={{marginBottom:err?10:20}}>
+          <label className="LS">密碼</label>
+          <div style={{position:"relative"}}>
+            <input className="IS" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLogin()} type={showPw?"text":"password"} placeholder="請輸入密碼" style={{paddingRight:46}}/>
+            <button onClick={()=>setShowPw(p=>!p)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:20}}>{showPw?"🙈":"👁️"}</button>
+          </div>
+        </div>
+        {err&&<div style={{background:"#fff1f1",border:"1px solid #fca5a5",borderRadius:10,padding:"8px 12px",color:"#b91c1c",fontSize:13,fontWeight:700,marginBottom:14}}>⚠️ {err}</div>}
+        <button onClick={doLogin} className="tap btn-blue" style={{width:"100%",fontSize:15}}>登入</button>
+      </div>
+    </div>
+  );
+}
+
+// ══ WALLET CARD (client) ═════════════════════
+function WalletTab({nick,orders,myWallet,walletBal,cart,sellRates,clients}){
+  const logs=(myWallet.logs||[]);
+  const totalDeposit=logs.filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+  const clientData=clients?clients.find(c=>c.name===nick):null;
+  const myOrders=orders.filter(o=>o.clientName===nick||(clientData&&o.clientCode===clientData.clientCode));
+  const totalSpent=myOrders.reduce((s,o)=>s+productTWD(o,sellRates),0);
+  const level=getMemberLevel(totalDeposit);
+  const tickets=getLotteryTickets(totalSpent);
+  const hasFreeShip=walletBal>0||totalSpent>=3000;
+  const cartSum=cart.reduce((s,i)=>s+(i.product?.isStock?(i.product.priceTWD||i.product.price)*i.qty:productTWD(i.product,sellRates)*i.qty),0);
+  const cashback=level.cashback>0?Math.floor(cartSum*level.cashback):0;
+  const nextLevel=MEMBER_LEVELS.slice().reverse().find(l=>l.minDeposit>totalDeposit);
+  const orderLogs=myOrders.map(o=>({
+    id:"order_"+o.id,
+    date:o.createdAt||o.updatedAt,
+    type:"order",
+    amount:-productTWD(o,sellRates),
+    note:"📦 "+o.item,
+    status:o.status,
+  }));
+  const allLogs=[...logs.map(l=>({...l,type:l.type})),...orderLogs]
+    .sort((a,b)=>b.date?.localeCompare(a.date||"")||0);
+  return(
+    <div>
+      {/* Level card */}
+      <div style={{background:`linear-gradient(135deg,${level.color}bb,${level.color})`,borderRadius:20,padding:"20px",marginBottom:14,boxShadow:`0 4px 20px ${level.color}44`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+          <div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.8)",fontWeight:700}}>會員等級</div>
+            <div style={{fontWeight:900,fontSize:22,color:"#fff",marginTop:2}}>{level.icon} {level.name}</div>
+            {level.minDeposit>0&&<div style={{fontSize:11,color:"rgba(255,255,255,.75)",marginTop:2}}>累計儲值 NT${totalDeposit.toLocaleString()}</div>}
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.8)"}}>💰 購物金</div>
+            <div style={{fontWeight:900,fontSize:26,color:"#fff"}}>NT${walletBal.toLocaleString()}</div>
+          </div>
+        </div>
+        <div style={{background:"rgba(255,255,255,.2)",borderRadius:12,padding:"10px 14px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:12,color:"#fff"}}>
+            <div>💱 一般：<b>0.26</b></div>
+            <div>🎫 門票：<b>{level.ticketRate}</b></div>
+            <div>🍱 土產：<b>{level.souvenirRate}</b></div>
+            <div>💸 回饋：<b>{level.cashback>0?`${level.cashback*100}%`:"無"}</b></div>
+            <div>🚚 免運：<b>{hasFreeShip?"✅":"未達"}</b></div>
+            <div>🎁 禮物：<b>{level.gift?"✅":"無"}</b></div>
+          </div>
+        </div>
+      </div>
+      {/* Progress */}
+      {nextLevel?(
+        <div className="card" style={{padding:"14px 16px",marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#2d1f1a"}}>距離 {nextLevel.icon}{nextLevel.name}</div>
+            <div style={{fontSize:13,color:"#b8887a"}}>還差 NT${(nextLevel.minDeposit-totalDeposit).toLocaleString()}</div>
+          </div>
+          <div style={{height:8,background:"#f5e6d8",borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${Math.min(100,Math.round(totalDeposit/nextLevel.minDeposit*100))}%`,background:`linear-gradient(135deg,${nextLevel.color},${nextLevel.color}99)`,borderRadius:4}}/>
+          </div>
+        </div>
+      ):(
+        <div style={{background:"#f0fdf4",borderRadius:14,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#166534",fontWeight:700,textAlign:"center"}}>🎉 已達最高等級！</div>
+      )}
+      {/* Lottery */}
+      {tickets>0&&(
+        <div style={{background:"linear-gradient(135deg,#fdf4ff,#fae8ff)",border:"1.5px solid #e9d5ff",borderRadius:14,padding:"12px 16px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div><div style={{fontWeight:800,color:"#7e22ce",fontSize:14}}>🎟️ 抽獎券</div><div style={{fontSize:12,color:"#a855f7",marginTop:2}}>每消費滿 NT$888 送 1 張</div></div>
+          <div style={{fontWeight:900,fontSize:28,color:"#7e22ce"}}>{tickets} 張</div>
+        </div>
+      )}
+      {/* Cashback preview */}
+      {cart.length>0&&cashback>0&&(
+        <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:14,padding:"12px 16px",marginBottom:14}}>
+          <div style={{fontSize:13,color:"#166534",fontWeight:700}}>🛒 本次回饋預估</div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:13}}>
+            <span style={{color:"#8a6a5a"}}>NT${cartSum.toLocaleString()}</span>
+            <span style={{fontWeight:900,color:"#22c55e"}}>回饋 -NT${cashback.toLocaleString()}</span>
+            <span style={{fontWeight:900,color:"#2d1f1a"}}>= NT${(cartSum-cashback).toLocaleString()}</span>
+          </div>
+          <div style={{fontSize:11,color:"#b8887a",marginTop:4}}>⚠️ 最終金額由業者確認</div>
+        </div>
+      )}
+      {/* Logs */}
+      <div style={{fontWeight:800,color:"#2d1f1a",fontSize:15,marginBottom:10}}>交易明細</div>
+      {allLogs.length===0
+        ?<div className="card" style={{padding:32,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>📒</div><div style={{fontWeight:700,marginTop:8}}>還沒有交易記錄</div></div>
+        :<div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {allLogs.map(log=>{
+            const isOrder=log.type==="order";
+            const s=isOrder?STATUS[log.status]:null;
+            return(
+              <div key={log.id} className="card" style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",
+                background:isOrder?"#fffaf5":"#fff"}}>
+                <div style={{flex:1,marginRight:8}}>
+                  <div style={{fontWeight:700,color:"#2d1f1a",fontSize:14}}>{log.note}</div>
+                  <div style={{display:"flex",gap:6,marginTop:2,alignItems:"center"}}>
+                    <span style={{fontSize:11,color:"#b8887a"}}>{log.date}</span>
+                    {isOrder&&s&&<span style={{fontSize:10,background:s.bg,color:s.color,borderRadius:6,padding:"1px 6px",fontWeight:700}}>{s.icon}{s.label}</span>}
+                  </div>
+                </div>
+                <div style={{fontWeight:900,fontSize:15,color:log.amount>0?"#22c55e":"#c8756a",flexShrink:0}}>
+                  {log.amount>0?"+":""}NT${Math.abs(log.amount).toLocaleString()}
+                </div>
+              </div>
+            );
+          })}
+          {/* 總額 */}
+          {(()=>{
+            const totalOrder=allLogs.filter(l=>l.type==="order").reduce((s,l)=>s+Math.abs(l.amount),0);
+            const totalTopup=allLogs.filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+            const totalDeducted=allLogs.filter(l=>l.type==="deduct").reduce((s,l)=>s+Math.abs(l.amount),0);
+            // 還需支付 = 累計消費 - 購物金餘額（業者充值的金額）
+            const stillNeedToPay=Math.max(0,totalOrder-walletBal);
+            return(
+              <div style={{background:"linear-gradient(135deg,#fff8f0,#fde8d8)",borderRadius:16,padding:"14px 16px",marginTop:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}>
+                  <span style={{color:"#8a6a5a"}}>💰 累計儲值</span>
+                  <span style={{fontWeight:700,color:"#22c55e"}}>+NT${totalTopup.toLocaleString()}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}>
+                  <span style={{color:"#8a6a5a"}}>📦 累計消費</span>
+                  <span style={{fontWeight:700,color:"#c8756a"}}>NT${totalOrder.toLocaleString()}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:10}}>
+                  <span style={{color:"#8a6a5a"}}>💳 購物金餘額</span>
+                  <span style={{fontWeight:700,color:walletBal>0?"#22c55e":"#8a6a5a"}}>NT${walletBal.toLocaleString()}</span>
+                </div>
+                <div style={{borderTop:"1.5px solid #f0d9cc",paddingTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontWeight:900,color:"#2d1f1a",fontSize:15}}>🧾 還需支付貨款</span>
+                  <span style={{fontWeight:900,color:stillNeedToPay>0?"#e11d48":"#22c55e",fontSize:22}}>
+                    NT${stillNeedToPay.toLocaleString()}
+                  </span>
+                </div>
+                {stillNeedToPay===0&&<div style={{textAlign:"center",fontSize:12,color:"#22c55e",fontWeight:700,marginTop:6}}>✅ 已全部結清！</div>}
+              </div>
+            );
+          })()}
+        </div>
+      }
+    </div>
+  );
+}
+
+// ══ CLIENT WALLET CARD (agent) ═══════════════
+function ClientCard({c,orders,wallets,setWallets,setClients,showToast,onBilling}){
+  const [showW,setShowW]=useState(false);
+  const [amt,setAmt]=useState("");const [note,setNote]=useState("");
+  const w=wallets[c.clientCode]||{balance:0,logs:[]};
+  const n=orders.filter(o=>o.clientCode===c.clientCode||o.clientName===c.name).length;
+  const totalDep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+  const lv=getMemberLevel(totalDep);
+  function doTopup(type){
+    const a=parseInt(amt);if(!a||a<=0)return;
+    const now=new Date().toISOString().split("T")[0];
+    const delta=type==="add"?a:-a;
+    const newBal=(w.balance||0)+delta;
+    if(newBal<0){showToast("餘額不足","error");return;}
+    const newLog={id:Date.now(),date:now,type,amount:delta,note:note||(type==="add"?"充值":"扣款")};
+    setWallets(p=>({...p,[c.clientCode]:{balance:newBal,logs:[...(w.logs||[]),newLog]}}));
+    setAmt("");setNote("");
+    showToast(type==="add"?`已充值 NT$${a.toLocaleString()} 🎉`:`已扣款 NT$${a.toLocaleString()}`);
+  }
+  return(
+    <div className="card" style={{overflow:"hidden"}}>
+      <div style={{padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:38,height:38,borderRadius:11,background:"linear-gradient(135deg,#bae6fd,#c8756a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>👤</div>
+          <div>
+            <div style={{fontWeight:800,color:"#2d1f1a",fontSize:15}}>{c.name} <span style={{fontSize:12,color:lv.color,fontWeight:700}}>{lv.icon}{lv.name}</span></div>
+            <div style={{fontSize:12,color:"#b8887a"}}>{n} 筆　<span style={{color:"#b5622e",fontWeight:700}}>💰 NT${(w.balance||0).toLocaleString()}</span></div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={()=>onBilling&&onBilling()} className="tap" style={{padding:"6px 12px",borderRadius:10,border:"1.5px solid #e9d5ff",background:"#fdf4ff",fontSize:12,cursor:"pointer",fontWeight:700,color:"#a855f7",fontFamily:"inherit"}}>📊</button>
+          <button onClick={()=>setShowW(p=>!p)} className="tap" style={{padding:"6px 12px",borderRadius:10,border:"1.5px solid #f0d9cc",background:"#fffaf5",fontSize:12,cursor:"pointer",fontWeight:700,color:"#c8756a",fontFamily:"inherit"}}>{showW?"▲":"💰"}</button>
+          <button onClick={()=>setClients(p=>p.filter(x=>x.clientCode!==c.clientCode))} className="tap" style={{padding:"6px 12px",borderRadius:10,border:"1.5px solid #fee2e2",background:"#fff8f8",fontSize:12,cursor:"pointer",fontWeight:700,color:"#f87171",fontFamily:"inherit"}}>🗑️</button>
+        </div>
+      </div>
+      {showW&&(
+        <div style={{background:"#fff8ee",borderTop:"1.5px solid #f0c070",padding:"14px 16px"}}>
+          <div style={{fontWeight:800,color:"#2d1f1a",fontSize:14,marginBottom:10}}>💰 購物金管理</div>
+          <div style={{background:"#fff8ee",borderRadius:12,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:13,color:"#8a4e22",fontWeight:700}}>目前餘額</span>
+            <span style={{fontWeight:900,color:"#b5622e",fontSize:20}}>NT${(w.balance||0).toLocaleString()}</span>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            <input className="IS" type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="金額（NT$）" style={{flex:2}}/>
+            <input className="IS" value={note} onChange={e=>setNote(e.target.value)} placeholder="備註" style={{flex:3}}/>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>doTopup("add")} className="tap" style={{flex:1,padding:"10px 0",borderRadius:10,border:"none",background:"linear-gradient(135deg,#7cb87a,#9ed09c)",color:"#fff",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>＋ 充值</button>
+            <button onClick={()=>doTopup("deduct")} className="tap" style={{flex:1,padding:"10px 0",borderRadius:10,border:"1.5px solid #fee2e2",background:"#fff8f8",color:"#ef4444",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>− 扣款</button>
+          </div>
+          {(w.logs||[]).length>0&&(
+            <div style={{marginTop:12}}>
+              <div style={{fontSize:12,color:"#b8887a",fontWeight:700,marginBottom:6}}>最近交易</div>
+              {[...(w.logs||[])].reverse().slice(0,5).map(log=>(
+                <div key={log.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #f0c070",fontSize:12}}>
+                  <span style={{color:"#7a4a22"}}>{log.note} · {log.date}</span>
+                  <span style={{fontWeight:800,color:log.amount>0?"#22c55e":"#ef4444"}}>{log.amount>0?"+":""}NT${Math.abs(log.amount).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══ GROUP ITEM ROW ════════════════════════════
+function GroupItemRow({item,idx,onChange,onRemove,canRemove,sellRates,groupProduct,wallets,client}){
+  const imgRef=useRef();
+  const w=wallets[client?.clientCode]||{balance:0,logs:[]};
+  const dep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+  const lv=getMemberLevel(dep);
+  const rate=groupProduct.rateType==="souvenir"?lv.souvenirRate:(RATE_TYPES[groupProduct.rateType]?.rate||0.26);
+  const twd=item.price?Math.ceil(+item.price*rate):0;
+
+  async function handleImg(e){
+    const f=e.target.files?.[0]; if(!f)return;
+    const compressed=await compressImage(f);
+    onChange("image",compressed);
+    e.target.value="";
+  }
+
+  return(
+    <div style={{background:"#fffaf5",borderRadius:14,padding:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontWeight:700,color:"#c8756a",fontSize:13}}>商品 {idx+1}</div>
+        {canRemove&&<button onClick={onRemove} style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:16}}>🗑️</button>}
+      </div>
+      {/* Image upload */}
+      <div onClick={()=>imgRef.current?.click()} className="tap"
+        style={{width:"100%",height:90,borderRadius:12,overflow:"hidden",cursor:"pointer",background:item.image?"transparent":"#fff8f0",border:`2px dashed ${item.image?"transparent":"#d4a898"}`,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:10,position:"relative"}}>
+        {item.image?<img src={item.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+          :<div style={{textAlign:"center",color:"#b8887a"}}><div style={{fontSize:22}}>📷</div><div style={{fontSize:11,fontWeight:700}}>上傳商品圖片</div></div>}
+        {item.image&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,.45)",borderRadius:6,padding:"2px 8px",fontSize:10,color:"#fff"}}>更換</div>}
+        <input ref={imgRef} type="file" accept="image/*" onChange={handleImg} style={{display:"none"}}/>
+      </div>
+      <div style={{marginBottom:8}}><input className="IS" value={item.name} onChange={e=>onChange("name",e.target.value)} placeholder="商品名稱（例：北海道牛奶糖）" style={{fontSize:13}}/></div>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <input className="IS" type="number" value={item.price} onChange={e=>onChange("price",e.target.value)} placeholder="日幣價格" style={{flex:1,fontSize:13}}/>
+        <span style={{color:"#b8887a",fontSize:12}}>¥</span>
+        {item.price&&<span style={{fontWeight:800,color:"#b5622e",fontSize:13,whiteSpace:"nowrap"}}>= NT${twd.toLocaleString()}</span>}
+      </div>
+      {item.price&&<div style={{fontSize:11,color:"#b8887a",marginTop:6}}>匯率 {rate}（{lv.icon}{lv.name}）</div>}
+    </div>
+  );
+}
+
+// ══ CLIENT VIEW ══════════════════════════════
+function ClientView({orders,setOrders,clients,setClients,products,sellRates,wallets,setWallets,wishlists,setWishlists,pending,setPending,announce,stockItems,setStockItems,onBack}){
+  const [nick,setNick]=useState("");const [inp,setInp]=useState("");
+  const [ctab,setCtab]=useState("catalog");const [cat,setCat]=useState("全部");const [search,setSearch]=useState("");
+  const [cart,setCart]=useState([]);const [showCart,setShowCart]=useState(false);
+  const [detail,setDetail]=useState(null);const [dQty,setDQty]=useState(1);const [dNote,setDNote]=useState("");const [dPrice,setDPrice]=useState("");
+  const [showManual,setShowManual]=useState(false);const [mForm,setMForm]=useState({item:"",price:"",currency:"JPY",note:""});
+  const [showWish,setShowWish]=useState(false);const [wForm,setWForm]=useState({item:"",note:""});
+  const [showGroup,setShowGroup]=useState(null); // holds the group product being ordered
+  const [groupItems,setGroupItems]=useState([{name:"",price:"",image:null,imgKey:Date.now()}]);
+  const [toast,showToast]=useToast();
+  const mImg=useImg();const dImg=useImg();const wImg=useImg();
+
+  const client=clients.find(c=>c.name===nick);
+  const myOrders=orders.filter(o=>o.clientName===nick);
+  const myWallet=client?(wallets[client.clientCode]||{balance:0,logs:[]}):{balance:0,logs:[]};
+  const walletBal=myWallet.balance||0;
+  const cartCount=cart.reduce((s,i)=>s+i.qty,0);
+  const cartTotal=cart.reduce((s,i)=>s+(i.product?.isStock?(i.product.priceTWD||i.product.price)*i.qty:productTWD(i.product,sellRates)*i.qty),0);
+  const visible=products.filter(p=>(cat==="全部"||p.category===cat)&&(!search||p.name.toLowerCase().includes(search.toLowerCase())||p.desc?.toLowerCase().includes(search.toLowerCase())));
+
+  function lookup(){
+    if(!inp.trim()){showToast("請輸入名字","error");return;}
+    const name=inp.trim();
+    const existing=clients.find(c=>c.name===name);
+    if(!existing){
+      const code="U"+Date.now().toString().slice(-6);
+      setClients(p=>{const np=[...p,{clientCode:code,name}];save("clients",np);return np;});
+      // 新客人第一次登入通知
+      const time=new Date().toLocaleString("zh-TW",{hour12:false});
+      notifyDiscord(`👋 **新客人登入！**\n👤 **${name}** 第一次進入系統\n🕐 ${time}`);
+    } else {
+      // 舊客人登入通知
+      const time=new Date().toLocaleString("zh-TW",{hour12:false});
+      notifyDiscord(`🔔 **客人上線！**\n👤 **${name}** 進入系統\n🕐 ${time}`);
+    }
+    setNick(name);setCart([]);
+  }
+
+  function addToCart(product,qty,note,image=null){
+    setCart(prev=>[...prev,{product,qty,note,image,cartId:Date.now()+Math.random()}]);
+    showToast("已加入購物車 🛒");
+  }
+  function rmCart(id){setCart(p=>p.filter(i=>i.cartId!==id));}
+  function updQty(id,d){setCart(p=>p.map(i=>i.cartId===id?{...i,qty:Math.max(1,i.qty+d)}:i));}
+
+  function submitCart(){
+    if(!cart.length)return;
+    const now=new Date().toISOString().split("T")[0];
+    const time=new Date().toLocaleString("zh-TW",{hour12:false});
+
+    // Split cart into stock items and preorder items
+    const stockCart   = cart.filter(i=>i.product?.isStock);
+    const preorderCart= cart.filter(i=>!i.product?.isStock);
+
+    const nos=[];
+
+    // Stock items → direct orders, deduct qty
+    if(stockCart.length>0){
+      stockCart.forEach(item=>{
+        for(let i=0;i<item.qty;i++){
+          nos.push({
+            id:Date.now()+Math.random(),
+            clientCode:client.clientCode,clientName:client.name,
+            item:"🏪 "+item.product.name,
+            price:item.product.priceTWD,
+            currency:"TWD",customRate:1,
+            note:item.note,image:item.image||null,
+            status:"pending",isStock:true,
+            createdAt:now,updatedAt:now,walletDeducted:false
+          });
+        }
+      });
+      // Deduct stock qty
+      setStockItems(p=>p.map(s=>{
+        const inCart=stockCart.find(i=>i.product.stockId===s.id);
+        if(inCart) return {...s,qty:Math.max(0,s.qty-inCart.qty)};
+        return s;
+      }));
+    }
+
+    // Preorder items → pending_review，每個數量獨立一筆
+    if(preorderCart.length>0){
+      preorderCart.forEach(item=>{
+        for(let i=0;i<item.qty;i++){
+          nos.push({
+            id:Date.now()+Math.random(),
+            clientCode:client.clientCode,clientName:client.name,
+            item:item.product.name,
+            price:item.product.price,
+            clientPrice:item.product.price,
+            currency:"JPY",
+            rateType:item.product.rateType||"general",
+            groupRateType:item.product.groupRateType||"general",
+            customRate:item.product.customRate,
+            note:item.note,image:item.image||null,
+            status:"pending_review",
+            createdAt:now,updatedAt:now,walletDeducted:false
+          });
+        }
+      });
+    }
+
+    setOrders(p=>[...p,...nos]);
+    const total=nos.reduce((s,o)=>s+productTWD(o,sellRates),0);
+    if(preorderCart.length>0){
+      const itemList=preorderCart.map(i=>{
+        const p=i.product;
+        const rate=RATE_TYPES[p.groupRateType||p.rateType||"general"]?.rate||0.26;
+        const twd=p.rateType==="gacha"?gachaTWD(p.price,p.keepShell):Math.ceil(p.price*rate);
+        return `　📦 ${p.name}${i.qty>1?` x${i.qty}`:""} ¥${p.price} ≈ NT$${twd}${i.note?` (${i.note})`:""}`;
+      }).join("\n");
+      notifyDiscord(`🛍️ **新喊單！需審核金額**\n👤 客人：**${client.name}**\n${itemList}\n💰 預估：NT$${total.toLocaleString()}\n🕐 ${time}\n⚠️ 請至後台審核並確認金額`);
+    }
+    if(stockCart.length>0){
+      const stockList=stockCart.map(i=>`　🏪 ${i.product.name}${i.qty>1?` x${i.qty}`:""} NT$${i.product.priceTWD}`).join("\n");
+      notifyDiscord(`🏪 **現貨訂單！**\n👤 客人：**${client.name}**\n${stockList}\n🕐 ${time}`);
+    }
+    showToast(`已送出 ${nos.length} 件 🎉`);
+    setCart([]);setShowCart(false);setCtab("orders");
+  }
+
+  function submitManual(){
+    if(!mForm.item||!mForm.price){showToast("請填寫商品名稱和價格","error");return;}
+    const now=new Date().toISOString().split("T")[0];
+    const time=new Date().toLocaleString("zh-TW",{hour12:false});
+    setOrders(p=>[...p,{id:Date.now(),clientCode:client.clientCode,clientName:client.name,
+      item:mForm.item,price:+mForm.price,currency:mForm.currency,note:mForm.note,image:mImg.img,status:"pending",createdAt:now,updatedAt:now}]);
+    notifyDiscord(`✍️ **手動喊單！**\n👤 **${client.name}**\n　📦 ${mForm.item}　${mForm.currency} ${mForm.price}${mForm.note?`\n　📝 ${mForm.note}`:""}\n🕐 ${time}`);
+    setMForm({item:"",price:"",currency:"JPY",note:""});mImg.setImg(null);setShowManual(false);
+    showToast("已送出需求 🎉");
+  }
+
+  return(
+    <div style={{minHeight:"100vh",paddingBottom:80}}>
+      <Toast t={toast}/>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#e8a898,#c8756a)",padding:"16px 20px 24px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.7)"}}>🛍️ ShopTrack</div>
+            <div style={{fontWeight:900,fontSize:20,color:"#fff",marginTop:2}}>{nick?`👋 ${nick}`:"客人點單專區"}</div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {nick&&cartCount>0&&(
+              <button onClick={()=>setShowCart(true)} className="tap" style={{position:"relative",background:"#fff",border:"none",borderRadius:14,padding:"8px 14px",fontWeight:800,cursor:"pointer",fontSize:13,color:"#c8756a",fontFamily:"inherit"}}>
+                🛒 購物車
+                <span style={{position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",borderRadius:"50%",width:20,height:20,fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{cartCount}</span>
+              </button>
+            )}
+            <button onClick={onBack} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:10,padding:"7px 12px",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>← 返回</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{padding:"16px 16px 0"}}>
+        {!nick&&(
+          <div className="card" style={{padding:20,marginTop:-12}}>
+            <div style={{fontWeight:800,fontSize:15,color:"#2d1f1a",marginBottom:14}}>輸入你的群組暱稱</div>
+            <div style={{display:"flex",gap:10}}>
+              <input className="IS" value={inp} onChange={e=>setInp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&lookup()} placeholder="輸入群組暱稱" style={{flex:1}}/>
+              <button onClick={lookup} className="tap" style={{background:"linear-gradient(135deg,#c8756a,#e0957a)",color:"#fff",border:"none",borderRadius:12,padding:"0 20px",fontWeight:800,cursor:"pointer",fontSize:14,fontFamily:"inherit",whiteSpace:"nowrap"}}>進入</button>
+            </div>
+          </div>
+        )}
+
+        {nick&&client&&(
+          <>
+            {/* Tabs */}
+            <div style={{display:"flex",background:"#fff",borderRadius:14,padding:4,marginBottom:16,marginTop:-8,gap:4,boxShadow:"0 2px 12px rgba(100,160,220,.1)",overflowX:"auto"}}>
+              {[["stock","🏪 現貨"],["catalog","🛒 目錄"],["orders","📋 訂單"],["wish","⭐ 許願"],["wallet","💰 購物金"]].map(([k,l])=>(
+                <button key={k} onClick={()=>setCtab(k)} className="tap"
+                  style={{flex:1,padding:"10px 4px",borderRadius:11,border:"none",cursor:"pointer",fontWeight:800,fontSize:12,fontFamily:"inherit",whiteSpace:"nowrap",
+                    background:ctab===k?"linear-gradient(135deg,#c8756a,#e0957a)":"transparent",
+                    color:ctab===k?"#fff":"#b8887a"}}>{l}</button>
+              ))}
+            </div>
+            {walletBal>0&&ctab!=="wallet"&&(
+              <div style={{background:"linear-gradient(135deg,#fff8ee,#fde8c0)",border:"1.5px solid #f0c070",borderRadius:14,padding:"10px 16px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{fontSize:13,color:"#8a4e22",fontWeight:700}}>💰 購物金餘額</div>
+                <div style={{fontWeight:900,color:"#b5622e",fontSize:18}}>NT${walletBal.toLocaleString()}</div>
+              </div>
+            )}
+
+            {/* STOCK */}
+            {ctab==="stock"&&(
+              <StockClientTab stockItems={stockItems} cart={cart} addToCart={addToCart} sellRates={sellRates}/>
+            )}
+
+            {/* CATALOG */}
+            {ctab==="catalog"&&(
+              <>
+                {/* 搜尋框 */}
+                <div style={{position:"relative",marginBottom:12}}>
+                  <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:16,color:"#b8887a"}}>🔍</span>
+                  <input className="IS" value={search} onChange={e=>setSearch(e.target.value)}
+                    placeholder="搜尋商品名稱..." style={{paddingLeft:42,borderRadius:16}}/>
+                  {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:18,color:"#d4a898"}}>×</button>}
+                </div>
+                <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4,marginBottom:14}}>
+                  {CATS.map(c=>(
+                    <button key={c} onClick={()=>setCat(c)} className="tap"
+                      style={{padding:"7px 14px",borderRadius:16,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,whiteSpace:"nowrap",fontFamily:"inherit",
+                        background:cat===c?"#c8756a":"#fff",color:cat===c?"#fff":"#7ab3d0",
+                        boxShadow:cat===c?"0 2px 8px rgba(200,117,106,.3)":"0 1px 4px rgba(100,160,220,.1)"}}>{c}</button>
+                  ))}
+                </div>
+                {visible.length===0
+                  ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>{search?"🔍":"📦"}</div><div style={{fontWeight:700,marginTop:8}}>{search?`找不到「${search}」相關商品`:"此分類目前沒有商品"}</div></div>
+                  :<div className="grid2">
+                    {visible.map(p=>{
+                      const sell=productTWD(p,sellRates);
+                      const inCart=cart.filter(i=>i.product.id===p.id).reduce((s,i)=>s+i.qty,0);
+                      return(
+                        <div key={p.id} className="card tap" style={{overflow:"hidden",opacity:p.inStock?1:.6,cursor:p.inStock?"pointer":"default",position:"relative"}}
+                          onClick={()=>{
+                            if(!p.inStock)return;
+                            if(p.rateType==="group"){
+                              setShowGroup(p);
+                              setGroupItems([{name:"",price:"",image:null,imgKey:Date.now()}]);
+                            } else {
+                              setDetail(p);setDQty(1);setDNote("");setDPrice("");dImg.setImg(null);
+                            }
+                          }}>                          <div style={{width:"100%",height:130,background:"#fff8f0",position:"relative",overflow:"hidden"}}>
+                            {p.image?<img src={p.image} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                              :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,color:"#d4a898"}}>{CAT_ICON[p.category]||"📦"}</div>}
+                            {!p.inStock&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.35)",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontWeight:900,fontSize:14}}>已售完</span></div>}
+                            {inCart>0&&<div style={{position:"absolute",top:6,right:6,background:"#c8756a",color:"#fff",borderRadius:10,padding:"2px 8px",fontSize:11,fontWeight:800}}>已選 x{inCart}</div>}
+                            {p.rateType&&<div style={{position:"absolute",top:6,left:6,background:RATE_TYPES[p.rateType]?.color||"#c8756a",color:"#fff",borderRadius:8,padding:"2px 6px",fontSize:10,fontWeight:700}}>{RATE_TYPES[p.rateType]?.label}</div>}
+                          </div>
+                          <div style={{padding:"10px 12px 12px"}}>
+                            <div style={{fontWeight:800,fontSize:13,color:"#2d1f1a",lineHeight:1.3,marginBottom:4}}>{p.name}</div>
+                            {p.desc&&<div style={{fontSize:11,color:"#b8887a"}}>{p.desc}</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                }
+                <button onClick={()=>setShowManual(true)} className="tap"
+                  style={{width:"100%",marginTop:16,padding:"13px 0",borderRadius:14,border:"1.5px dashed #d4a898",background:"transparent",color:"#b8887a",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+                  ＋ 找不到商品？手動輸入 / 上傳圖片
+                </button>
+              </>
+            )}
+
+            {/* ORDERS */}
+            {ctab==="orders"&&(
+              myOrders.length===0
+                ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>📋</div><div style={{fontWeight:700,marginTop:8}}>還沒有訂單</div></div>
+                :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {[...myOrders].reverse().map(o=>{
+                    const s=STATUS[o.status];const sell=productTWD(o,sellRates);
+                    const steps=["pending","bought","shipped","arrived"];const prog=steps.indexOf(o.status);
+                    return(
+                      <div key={o.id} className="card" style={{overflow:"hidden"}}>
+                        {o.image&&<img src={o.image} alt="" style={{width:"100%",height:140,objectFit:"cover"}}/>}
+                        <div style={{padding:14}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                            <div style={{fontWeight:800,fontSize:15,color:"#2d1f1a",flex:1,marginRight:8}}>{o.item}</div>
+                            <span className="chip" style={{background:s.bg,color:s.color,flexShrink:0}}>{s.icon} {s.label}</span>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",marginBottom:10}}>
+                            {steps.map((st,i)=>(
+                              <React.Fragment key={st}>
+                                <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,background:i<=prog?STATUS[st].color:"#f5e6d8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",fontWeight:900}}>{i<=prog?"✓":""}</div>
+                                {i<steps.length-1&&<div style={{flex:1,height:3,margin:"0 3px",borderRadius:2,background:i<prog?"#c8756a":"#f5e6d8"}}/>}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                          <div style={{display:"flex",gap:12,fontSize:12}}>
+                            <span className="gold">{o.currency} {o.price.toLocaleString()}</span>
+                            <span style={{color:"#d4a898"}}>≈ NT${sell.toLocaleString()}</span>
+                            <span style={{color:"#d4a898"}}>{o.updatedAt}</span>
+                          </div>
+                          {o.note&&<div style={{marginTop:8,background:"#fffaf5",borderRadius:10,padding:"6px 10px",fontSize:12,color:"#8a6a5a"}}>📝 {o.note}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+            )}
+
+            {/* WISHLIST */}
+            {ctab==="wish"&&(
+              <div>
+                <div style={{background:"linear-gradient(135deg,#fdf4ff,#fae8ff)",border:"1.5px solid #e9d5ff",borderRadius:16,padding:"14px 16px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div><div style={{fontWeight:800,color:"#7e22ce",fontSize:15}}>⭐ 許願清單</div><div style={{fontSize:12,color:"#a855f7",marginTop:2}}>許願後業者會幫你留意！</div></div>
+                  <button onClick={()=>{setShowWish(true);setWForm({item:"",note:""});wImg.setImg(null);}} className="tap"
+                    style={{background:"linear-gradient(135deg,#a855f7,#9333ea)",color:"#fff",border:"none",borderRadius:12,padding:"9px 16px",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>＋ 許願</button>
+                </div>
+                {(wishlists[client.clientCode]||[]).length===0
+                  ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>⭐</div><div style={{fontWeight:700,marginTop:8}}>還沒有許願</div></div>
+                  :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {(wishlists[client.clientCode]||[]).map(w=>(
+                      <div key={w.id} className="card" style={{overflow:"hidden"}}>
+                        {w.image&&<img src={w.image} alt="" style={{width:"100%",height:120,objectFit:"cover"}}/>}
+                        <div style={{padding:"14px 16px"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                            <div style={{flex:1}}>
+                              <div style={{fontWeight:800,fontSize:15,color:"#2d1f1a",marginBottom:4}}>{w.item}</div>
+                              {w.note&&<div style={{fontSize:12,color:"#b8887a",background:"#fffaf5",borderRadius:8,padding:"4px 8px",marginBottom:4}}>📝 {w.note}</div>}
+                              <div style={{fontSize:11,color:"#d4a898"}}>{w.date}</div>
+                            </div>
+                            <div style={{display:"flex",flexDirection:"column",gap:6,marginLeft:10}}>
+                              <span className="chip" style={{background:w.status==="found"?"#eff6ff":w.status==="noted"?"#f0fdf4":"#fdf4ff",color:w.status==="found"?"#c8756a":w.status==="noted"?"#22c55e":"#a855f7"}}>
+                                {w.status==="found"?"🔍 找到了":w.status==="noted"?"✅ 已收到":"⭐ 許願中"}
+                              </span>
+                              <button onClick={()=>setWishlists(p=>({...p,[client.clientCode]:(p[client.clientCode]||[]).filter(x=>x.id!==w.id)}))} className="tap"
+                                style={{padding:"4px 8px",borderRadius:8,border:"1.5px solid #fee2e2",background:"#fff8f8",fontSize:11,cursor:"pointer",fontWeight:700,color:"#f87171",fontFamily:"inherit"}}>取消</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                }
+              </div>
+            )}
+
+            {/* WALLET */}
+            {ctab==="wallet"&&(
+              <WalletTab nick={nick} orders={orders} myWallet={myWallet} walletBal={walletBal} cart={cart} sellRates={sellRates} clients={clients}/>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* DETAIL MODAL */}
+      {detail&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setDetail(null)}>
+          <div className="modal-box" style={{padding:0}}>
+            <div style={{width:"100%",height:200,background:"#fff8f0",position:"relative",flexShrink:0,overflow:"hidden",borderRadius:"24px 24px 0 0"}}>
+              {detail.image?<img src={detail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:60}}>{CAT_ICON[detail.category]||"📦"}</div>}
+              <button onClick={()=>setDetail(null)} style={{position:"absolute",top:12,right:12,background:"rgba(255,255,255,.9)",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+              {detail.rateType&&<div style={{position:"absolute",top:12,left:12,background:RATE_TYPES[detail.rateType]?.color,color:"#fff",borderRadius:10,padding:"4px 10px",fontSize:12,fontWeight:800}}>{RATE_TYPES[detail.rateType]?.label}</div>}
+            </div>
+            <div style={{padding:"20px 20px 40px"}}>
+              <div style={{fontWeight:900,fontSize:18,color:"#2d1f1a",marginBottom:4}}>{detail.name}</div>
+              {detail.desc&&<div style={{fontSize:13,color:"#b8887a",marginBottom:14}}>{detail.desc}</div>}
+
+              {/* 扭蛋：顯示固定定價 */}
+              {detail.rateType==="gacha"?(
+                <div style={{background:"#fff8ee",borderRadius:14,padding:"12px 16px",marginBottom:16}}>
+                  <div style={{fontWeight:900,fontSize:22,color:"#b5622e"}}>NT${gachaTWD(detail.price,detail.keepShell)*dQty}</div>
+                  <div style={{fontSize:12,color:"#a0622e",marginTop:2}}>¥{detail.price} × {dQty} 件{detail.keepShell?" (含蛋殼)":""}</div>
+                </div>
+              ):(
+                /* 其他商品：客人自填現地日幣金額 */
+                <div style={{marginBottom:14}}>
+                  <label className="LS">💴 日幣金額（請填寫現地標價）</label>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <input className="IS" type="number" value={dPrice} onChange={e=>setDPrice(e.target.value)}
+                      placeholder="例：2800" style={{flex:1}}/>
+                    <span style={{color:"#b8887a",fontSize:20,whiteSpace:"nowrap"}}>¥</span>
+                  </div>
+                  {dPrice&&(
+                    <div style={{marginTop:8,background:"#fff8ee",border:"1.5px solid #f0c070",borderRadius:10,padding:"8px 12px",fontSize:13}}>
+                      <span className="gold">換算約 NT${Math.ceil(+dPrice*(RATE_TYPES[detail.groupRateType||detail.rateType||"general"]?.rate||0.26)*dQty).toLocaleString()}</span>
+                      <span style={{color:"#d4a898",fontSize:11,marginLeft:6}}>（最終由業者審核確認）</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{marginBottom:14}}>
+                <label className="LS">數量</label>
+                <div style={{display:"flex",alignItems:"center",gap:14}}>
+                  <button onClick={()=>setDQty(q=>Math.max(1,q-1))} className="tap" style={{width:40,height:40,borderRadius:12,border:"1.5px solid #f0d9cc",background:"#fff8f0",fontSize:20,cursor:"pointer",color:"#c8756a",fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>−</button>
+                  <span style={{fontWeight:900,fontSize:22,color:"#2d1f1a",minWidth:32,textAlign:"center"}}>{dQty}</span>
+                  <button onClick={()=>setDQty(q=>q+1)} className="tap" style={{width:40,height:40,borderRadius:12,border:"1.5px solid #f0d9cc",background:"#fff8f0",fontSize:20,cursor:"pointer",color:"#c8756a",fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>＋</button>
+                </div>
+              </div>
+              <div style={{marginBottom:14}}>
+                <label className="LS">📎 上傳款式圖片（選填）</label>
+                <ImgBox img={dImg.img} onPick={dImg.pick} iref={dImg.ref} onChange={dImg.onChange} label="點擊上傳款式圖片" h={100}/>
+                <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginTop:5}}>⚠️ 圖片太大可能導致下單失敗，建議截圖或壓縮後上傳</div>
+              </div>
+              <div style={{marginBottom:20}}>
+                <label className="LS">備註</label>
+                <textarea className="IS" value={dNote} onChange={e=>setDNote(e.target.value)} placeholder="例：白色 24.5cm" rows={2} style={{resize:"none"}}/>
+              </div>
+              <button onClick={()=>{
+                if(detail.rateType!=="gacha"&&!dPrice){return;}
+                const price=detail.rateType==="gacha"?detail.price:+dPrice;
+                addToCart({...detail,price,currency:"JPY"},dQty,dNote,dImg.img);
+                setDetail(null);
+              }} className="tap btn-blue" style={{width:"100%",fontSize:15,opacity:(detail.rateType==="gacha"||dPrice)?1:.5}}>
+                {detail.rateType==="gacha"||dPrice?"加入購物車 🛒":"請先填寫金額"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CART MODAL */}
+      {showCart&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowCart(false)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+              <div style={{fontWeight:900,fontSize:18,color:"#2d1f1a"}}>🛒 購物車（{cartCount} 件）</div>
+              <button onClick={()=>setShowCart(false)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+            </div>
+            {cart.length===0
+              ?<div style={{textAlign:"center",padding:32,color:"#d4a898"}}><div style={{fontSize:36}}>🛒</div><div style={{fontWeight:700,marginTop:8}}>購物車是空的</div></div>
+              :<>
+                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+                  {cart.map(item=>{
+                    const sell=item.product?.isStock
+                      ? (item.product.priceTWD||item.product.price)*item.qty
+                      : productTWD(item.product,sellRates)*item.qty;
+                    return(
+                      <div key={item.cartId} style={{background:"#fffaf5",borderRadius:14,overflow:"hidden"}}>
+                        {item.product?.isStock&&<div style={{background:"#f0fdf4",padding:"4px 12px",fontSize:11,color:"#166534",fontWeight:800}}>🏪 現貨</div>}
+                        {item.image&&<img src={item.image} alt="" style={{width:"100%",height:100,objectFit:"cover"}}/>}
+                        <div style={{padding:"12px 14px"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                            <div style={{flex:1}}>
+                              <div style={{fontWeight:800,color:"#2d1f1a",fontSize:14}}>{item.product.name}</div>
+                              {item.note&&<div style={{fontSize:12,color:"#b8887a",marginTop:2}}>📝 {item.note}</div>}
+                            </div>
+                            <button onClick={()=>rmCart(item.cartId)} style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:18,marginLeft:8}}>🗑️</button>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <button onClick={()=>updQty(item.cartId,-1)} className="tap" style={{width:28,height:28,borderRadius:8,border:"1.5px solid #f0d9cc",background:"#fff",fontSize:16,cursor:"pointer",color:"#c8756a",fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>−</button>
+                              <span style={{fontWeight:900,color:"#2d1f1a",fontSize:16}}>{item.qty}</span>
+                              <button onClick={()=>updQty(item.cartId,1)} className="tap" style={{width:28,height:28,borderRadius:8,border:"1.5px solid #f0d9cc",background:"#fff",fontSize:16,cursor:"pointer",color:"#c8756a",fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>＋</button>
+                            </div>
+                            <span className="gold" style={{fontSize:15}}>NT${sell.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{background:"#fff8ee",border:"1.5px solid #f0c070",borderRadius:14,padding:"14px 16px",marginBottom:20}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontWeight:800,color:"#7a4a22",fontSize:15}}>總計</div>
+                    <div style={{fontWeight:900,color:"#b5622e",fontSize:22}}>NT${cartTotal.toLocaleString()}</div>
+                  </div>
+                  <div style={{fontSize:12,color:"#a0622e",marginTop:4}}>共 {cartCount} 件 · 送出後業者確認</div>
+                </div>
+                <button onClick={submitCart} className="tap" style={{width:"100%",padding:14,borderRadius:14,border:"none",background:"linear-gradient(135deg,#7cb87a,#9ed09c)",color:"#fff",fontWeight:900,cursor:"pointer",fontSize:15,fontFamily:"inherit",boxShadow:"0 4px 14px rgba(124,184,122,.3)"}}>確認送出需求 ✅</button>
+              </>
+            }
+          </div>
+        </div>
+      )}
+
+      {/* MANUAL MODAL */}
+      {showManual&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowManual(false)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
+              <div style={{fontWeight:900,fontSize:17,color:"#2d1f1a"}}>✍️ 手動輸入需求</div>
+              <button onClick={()=>setShowManual(false)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+            </div>
+            <div style={{marginBottom:14}}>
+              <label className="LS">📷 商品圖片（選填）</label>
+              <ImgBox img={mImg.img} onPick={mImg.pick} iref={mImg.ref} onChange={mImg.onChange} label="點擊上傳商品圖片" h={120}/>
+              <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginTop:5}}>⚠️ 圖片檔案太大可能導致喊單失敗，建議使用截圖或壓縮後再上傳</div>
+            </div>
+            <div style={{marginBottom:13}}><label className="LS">商品名稱 *</label><input className="IS" value={mForm.item} onChange={e=>setMForm(p=>({...p,item:e.target.value}))} placeholder="例：Nike Air Force 1 白色"/></div>
+            <div style={{display:"flex",gap:10,marginBottom:13}}>
+              <div style={{flex:2}}><label className="LS">價格 *</label><input className="IS" type="number" value={mForm.price} onChange={e=>setMForm(p=>({...p,price:e.target.value}))} placeholder="0"/></div>
+              <div style={{flex:1}}><label className="LS">幣別</label><select className="IS" value={mForm.currency} onChange={e=>setMForm(p=>({...p,currency:e.target.value}))} style={{color:"#c8756a",fontWeight:700}}>{CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            </div>
+            {mForm.price&&<div style={{background:"#fff8ee",border:"1.5px solid #f0c070",borderRadius:12,padding:"8px 14px",marginBottom:13,fontSize:13}}><span className="gold">💱 約 NT${toTWD(+mForm.price,mForm.currency,sellRates).toLocaleString()}</span></div>}
+            <div style={{marginBottom:20}}><label className="LS">備註</label><textarea className="IS" value={mForm.note} onChange={e=>setMForm(p=>({...p,note:e.target.value}))} placeholder="尺寸、顏色、數量、連結等..." rows={3} style={{resize:"vertical"}}/></div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowManual(false)} className="tap btn-gray" style={{flex:1}}>取消</button>
+              <button onClick={submitManual} className="tap btn-blue" style={{flex:2}}>送出需求</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GROUP PRODUCT MODAL */}
+      {showGroup&&client&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowGroup(null)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <div>
+                <div style={{fontWeight:900,fontSize:17,color:"#2d1f1a"}}>🛍️ {showGroup.name}</div>
+                <div style={{fontSize:12,color:"#b8887a",marginTop:2}}>{showGroup.desc}</div>
+              </div>
+              <button onClick={()=>setShowGroup(null)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a",flexShrink:0}}>×</button>
+            </div>
+            <div style={{background:"#fff8f0",border:"1.5px solid #fed7aa",borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#c2410c",fontWeight:600}}>
+              ⚠️ 送出後需等業者審核才算正式訂單
+            </div>
+
+            {/* Items list */}
+            <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:14}}>
+              {groupItems.map((item,idx)=>(
+                <GroupItemRow key={item.imgKey} item={item} idx={idx}
+                  onChange={(field,val)=>setGroupItems(p=>p.map((x,i)=>i===idx?{...x,[field]:val}:x))}
+                  onRemove={()=>setGroupItems(p=>p.filter((_,i)=>i!==idx))}
+                  canRemove={groupItems.length>1}
+                  sellRates={sellRates} groupProduct={showGroup}
+                  wallets={wallets} client={client}
+                />
+              ))}
+            </div>
+
+            <button onClick={()=>setGroupItems(p=>[...p,{name:"",price:"",image:null,imgKey:Date.now()}])} className="tap"
+              style={{width:"100%",padding:"10px 0",borderRadius:12,border:"1.5px dashed #d4a898",background:"transparent",color:"#b8887a",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",marginBottom:20}}>
+              ＋ 新增商品
+            </button>
+
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowGroup(null)} className="tap btn-gray" style={{flex:1}}>取消</button>
+              <button onClick={()=>{
+                const valid=groupItems.filter(i=>i.name.trim()&&i.price);
+                if(valid.length===0){return;}
+                const now=new Date().toISOString().split("T")[0];
+                const time=new Date().toLocaleString("zh-TW",{hour12:false});
+                // get member level for client's souvenir rate
+                const w=wallets[client.clientCode]||{balance:0,logs:[]};
+                const dep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+                const lv=getMemberLevel(dep);
+                const rate=showGroup.rateType==="souvenir"?lv.souvenirRate:(RATE_TYPES[showGroup.rateType]?.rate||0.26);
+                const subs=valid.map(i=>({
+                  id:Date.now()+Math.random(),
+                  clientCode:client.clientCode,clientName:client.name,
+                  groupProductId:showGroup.id,groupProductName:showGroup.name,
+                  item:i.name.trim(),price:+i.price,currency:"JPY",
+                  twdPrice:Math.ceil(+i.price*rate),rate,
+                  image:i.image,note:"",status:"pending_review",
+                  createdAt:now,
+                }));
+                setPending(p=>[...p,...subs]);
+                const itemList=valid.map(i=>`　📦 ${i.name} ¥${i.price} = NT$${Math.ceil(+i.price*rate)}`).join("\n");
+                notifyDiscord(`🛒 **${showGroup.name} 代購申請！**\n👤 **${client.name}** （${lv.icon}${lv.name}，土產匯率 ${rate}）\n${itemList}\n🕐 ${time}`);
+                setShowGroup(null);
+                showToast(`已送出 ${valid.length} 件申請，等待業者審核 🎉`);
+              }} className="tap btn-blue" style={{flex:2}}>送出審核</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WISH MODAL */}
+      {showWish&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowWish(false)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
+              <div style={{fontWeight:900,fontSize:17,color:"#2d1f1a"}}>⭐ 新增許願</div>
+              <button onClick={()=>setShowWish(false)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+            </div>
+            <div style={{background:"#fdf4ff",border:"1.5px solid #e9d5ff",borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#7e22ce",fontWeight:600}}>💡 填入想找的商品，業者看到後會幫你留意！</div>
+            <div style={{marginBottom:14}}>
+              <label className="LS">📷 商品圖片（選填）</label>
+              <ImgBox img={wImg.img} onPick={wImg.pick} iref={wImg.ref} onChange={wImg.onChange} label="上傳商品截圖" h={100}/>
+              <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginTop:5}}>⚠️ 圖片檔案太大可能導致許願失敗，建議使用截圖或壓縮後再上傳</div>
+            </div>
+            <div style={{marginBottom:13}}><label className="LS">商品名稱 *</label><input className="IS" value={wForm.item} onChange={e=>setWForm(p=>({...p,item:e.target.value}))} placeholder="例：Hello Kitty 扭蛋、限定版球鞋"/></div>
+            <div style={{marginBottom:22}}><label className="LS">備註</label><textarea className="IS" value={wForm.note} onChange={e=>setWForm(p=>({...p,note:e.target.value}))} placeholder="顏色、尺寸、預算等..." rows={3} style={{resize:"none"}}/></div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowWish(false)} className="tap btn-gray" style={{flex:1}}>取消</button>
+              <button onClick={()=>{
+                if(!wForm.item.trim())return;
+                const now=new Date().toISOString().split("T")[0];
+                const time=new Date().toLocaleString("zh-TW",{hour12:false});
+                const newW={id:Date.now(),item:wForm.item.trim(),note:wForm.note,image:wImg.img,date:now,status:"pending"};
+                setWishlists(p=>({...p,[client.clientCode]:[...(p[client.clientCode]||[]),newW]}));
+                notifyDiscord(`⭐ **新許願！**\n👤 **${client.name}**\n　🎯 ${wForm.item.trim()}${wForm.note?`\n　📝 ${wForm.note}`:""}\n🕐 ${time}`);
+                setShowWish(false);setWForm({item:"",note:""});wImg.setImg(null);
+              }} className="tap" style={{flex:2,padding:13,borderRadius:14,border:"none",background:"linear-gradient(135deg,#a855f7,#9333ea)",color:"#fff",fontWeight:900,cursor:"pointer",fontSize:14,fontFamily:"inherit"}}>
+                送出許願 ⭐
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══ REVIEW CARD ═══════════════════════════════
+function ReviewCard({o,twd,sellRates,onApprove,onReject}){
+  const [editPrice,setEditPrice]=useState(String(o.price));
+  const rate=RATE_TYPES[o.groupRateType||o.rateType||"general"]?.rate||0.26;
+  const finalTWD=editPrice?Math.round(+editPrice*rate):twd;
+  return(
+    <div className="card" style={{overflow:"hidden"}}>
+      {o.image&&<img src={o.image} alt="" style={{width:"100%",height:130,objectFit:"cover"}}/>}
+      <div style={{padding:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <span className="chip" style={{background:"#fff1f1",color:"#e11d48"}}>🔍 待審核</span>
+          <span style={{fontSize:11,color:"#d4a898"}}>👤 {o.clientName} · {o.createdAt}</span>
+        </div>
+        <div style={{fontWeight:900,fontSize:15,color:"#2d1f1a",marginBottom:8}}>{o.item}</div>
+        {o.note&&<div style={{background:"#fffaf5",borderRadius:10,padding:"6px 10px",fontSize:12,color:"#8a6a5a",marginBottom:10}}>📝 {o.note}</div>}
+
+        {/* 金額審核 */}
+        <div style={{background:"#fff8ee",border:"1.5px solid #f0c070",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+          <div style={{fontSize:12,color:"#8a4e22",fontWeight:700,marginBottom:8}}>💴 審核金額（可修改）</div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+            <input type="number" value={editPrice} onChange={e=>setEditPrice(e.target.value)}
+              style={{flex:1,padding:"8px 12px",borderRadius:10,border:"1.5px solid #f0c070",fontSize:16,fontWeight:900,color:"#b5622e",fontFamily:"inherit",outline:"none",background:"#fff"}}/>
+            <span style={{color:"#b8887a",fontWeight:700}}>¥</span>
+          </div>
+          <div style={{fontSize:13,color:"#b5622e",fontWeight:800}}>
+            ≈ NT${finalTWD.toLocaleString()}
+            <span style={{fontSize:11,color:"#a0622e",fontWeight:400,marginLeft:6}}>（匯率 {rate}）</span>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>onApprove(+editPrice)} className="tap"
+            style={{flex:2,padding:"11px 0",borderRadius:10,border:"none",background:"linear-gradient(135deg,#7cb87a,#9ed09c)",color:"#fff",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+            ✅ 確認金額 NT${finalTWD.toLocaleString()}
+          </button>
+          <button onClick={onReject} className="tap"
+            style={{flex:1,padding:"11px 0",borderRadius:10,border:"1.5px solid #fee2e2",background:"#fff8f8",color:"#ef4444",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+            ❌ 拒絕
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══ AGENT DASHBOARD ══════════════════════════
+// ══ STOCK AGENT TAB ══════════════════════════
+function StockAgentTab({stockItems,setStockItems,orders,setOrders,clients,showToast}){
+  const [showForm,setShowForm]=useState(false);
+  const [editItem,setEditItem]=useState(null);
+  const [form,setForm]=useState({name:"",priceTWD:"",qty:"",desc:"",image:null});
+  const imgUp=useImg();
+
+  function openAdd(){ setEditItem(null); setForm({name:"",priceTWD:"",qty:"",desc:"",image:null}); imgUp.setImg(null); setShowForm(true); }
+  function openEdit(item){ setEditItem(item); setForm({...item,priceTWD:String(item.priceTWD),qty:String(item.qty)}); imgUp.setImg(item.image); setShowForm(true); }
+  function submit(){
+    if(!form.name||!form.priceTWD||!form.qty){showToast("請填寫名稱、售價和數量","error");return;}
+    const data={...form,priceTWD:+form.priceTWD,qty:+form.qty,image:imgUp.img};
+    if(editItem){ setStockItems(p=>p.map(x=>x.id===editItem.id?{...x,...data}:x)); showToast("已更新 ✨"); }
+    else{ setStockItems(p=>[...p,{id:Date.now(),...data}]); showToast("現貨已上架 🎉"); }
+    setShowForm(false); setEditItem(null);
+  }
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontWeight:800,fontSize:15,color:"#2d1f1a"}}>🏪 現貨管理</div>
+        <button onClick={openAdd} className="tap"
+          style={{background:"linear-gradient(135deg,#c8756a,#e0957a)",color:"#fff",border:"none",borderRadius:16,padding:"8px 16px",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+          ＋ 上架現貨
+        </button>
+      </div>
+
+      {stockItems.length===0
+        ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>🏪</div><div style={{fontWeight:700,marginTop:8}}>還沒有現貨商品</div></div>
+        :<div className="grid2">
+          {stockItems.map(item=>(
+            <div key={item.id} className="card" style={{overflow:"hidden",opacity:item.qty>0?1:.6}}>
+              <div style={{width:"100%",height:110,background:"#fff8f0",position:"relative",overflow:"hidden"}}>
+                {item.image?<img src={item.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,color:"#d4a898"}}>🏷️</div>}
+                <div style={{position:"absolute",top:6,left:6,background:item.qty>0?"#22c55e":"#ef4444",color:"#fff",borderRadius:8,padding:"2px 8px",fontSize:10,fontWeight:800}}>
+                  {item.qty>0?`庫存 ${item.qty}`:"售完"}
+                </div>
+              </div>
+              <div style={{padding:"10px 12px"}}>
+                <div style={{fontWeight:800,fontSize:13,color:"#2d1f1a",marginBottom:2}}>{item.name}</div>
+                {item.desc&&<div style={{fontSize:11,color:"#b8887a",marginBottom:4}}>{item.desc}</div>}
+                <div style={{fontWeight:900,color:"#22c55e",fontSize:14,marginBottom:8}}>NT${item.priceTWD.toLocaleString()}</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>openEdit(item)} className="tap" style={{flex:1,padding:"5px 0",borderRadius:8,border:"1.5px solid #f0d9cc",background:"#fffaf5",fontSize:11,cursor:"pointer",fontWeight:700,color:"#c8756a",fontFamily:"inherit"}}>✏️ 編輯</button>
+                  <button onClick={()=>setStockItems(p=>p.filter(x=>x.id!==item.id))} className="tap" style={{flex:1,padding:"5px 0",borderRadius:8,border:"1.5px solid #fee2e2",background:"#fff8f8",fontSize:11,cursor:"pointer",fontWeight:700,color:"#f87171",fontFamily:"inherit"}}>🗑️</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      }
+
+      {/* Form Modal */}
+      {showForm&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowForm(false)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
+              <div style={{fontWeight:900,fontSize:18,color:"#2d1f1a"}}>{editItem?"✏️ 編輯現貨":"＋ 上架現貨"}</div>
+              <button onClick={()=>setShowForm(false)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+            </div>
+            <div style={{marginBottom:14}}><label className="LS">商品圖片</label><ImgBox img={imgUp.img} onPick={imgUp.pick} iref={imgUp.ref} onChange={imgUp.onChange} label="上傳現貨圖片" h={140}/></div>
+            <div style={{marginBottom:13}}><label className="LS">商品名稱 *</label><input className="IS" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="例：Hello Kitty 扭蛋 草莓款"/></div>
+            <div style={{display:"flex",gap:10,marginBottom:13}}>
+              <div style={{flex:1}}>
+                <label className="LS">售價 NT$ *</label>
+                <input className="IS" type="number" value={form.priceTWD} onChange={e=>setForm(p=>({...p,priceTWD:e.target.value}))} placeholder="例：350"/>
+              </div>
+              <div style={{flex:1}}>
+                <label className="LS">庫存數量 *</label>
+                <input className="IS" type="number" value={form.qty} onChange={e=>setForm(p=>({...p,qty:e.target.value}))} placeholder="例：5"/>
+              </div>
+            </div>
+            <div style={{marginBottom:20}}><label className="LS">商品說明（選填）</label><input className="IS" value={form.desc} onChange={e=>setForm(p=>({...p,desc:e.target.value}))} placeholder="例：全新未拆，附原廠盒"/></div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowForm(false)} className="tap btn-gray" style={{flex:1}}>取消</button>
+              <button onClick={submit} className="tap btn-blue" style={{flex:2}}>{editItem?"儲存變更":"上架現貨"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══ STOCK CLIENT TAB ══════════════════════════
+function StockClientTab({stockItems,cart,addToCart,sellRates}){
+  const [showDetail,setShowDetail]=useState(null);
+  const [dQty,setDQty]=useState(1);
+  const [dNote,setDNote]=useState("");
+
+  const available=stockItems.filter(p=>p.qty>0);
+
+  return(
+    <div>
+      <div style={{background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",border:"1.5px solid #86efac",borderRadius:14,padding:"10px 16px",marginBottom:16,fontSize:13,color:"#166534",fontWeight:700}}>
+        🍒 盤盤已買到的現貨們🍒
+      </div>
+      {available.length===0
+        ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>🏪</div><div style={{fontWeight:700,marginTop:8}}>目前沒有現貨</div><div style={{fontSize:13,marginTop:4}}>敬請期待補貨！</div></div>
+        :<div className="grid2">
+          {available.map(item=>{
+            const inCart=cart.filter(i=>i.product?.id===`stock_${item.id}`).reduce((s,i)=>s+i.qty,0);
+            return(
+              <div key={item.id} className="card tap" style={{overflow:"hidden",cursor:"pointer"}}
+                onClick={()=>{setShowDetail(item);setDQty(1);setDNote("");}}>
+                <div style={{width:"100%",height:130,background:"#f0fdf4",position:"relative",overflow:"hidden"}}>
+                  {item.image?<img src={item.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                    :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,color:"#86efac"}}>🏷️</div>}
+                  <div style={{position:"absolute",top:6,left:6,background:"#22c55e",color:"#fff",borderRadius:8,padding:"2px 8px",fontSize:10,fontWeight:800}}>現貨</div>
+                  {inCart>0&&<div style={{position:"absolute",top:6,right:6,background:"#c8756a",color:"#fff",borderRadius:8,padding:"2px 8px",fontSize:11,fontWeight:800}}>已選 x{inCart}</div>}
+                </div>
+                <div style={{padding:"10px 12px"}}>
+                  <div style={{fontWeight:800,fontSize:13,color:"#2d1f1a",lineHeight:1.3,marginBottom:4}}>{item.name}</div>
+                  {item.desc&&<div style={{fontSize:11,color:"#b8887a",marginBottom:4}}>{item.desc}</div>}
+                  <div style={{fontWeight:900,color:"#22c55e",fontSize:15}}>NT${item.priceTWD.toLocaleString()}</div>
+                  <div style={{fontSize:10,color:"#b8887a"}}>庫存 {item.qty} 件</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      }
+
+      {/* Detail Modal */}
+      {showDetail&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowDetail(null)}>
+          <div className="modal-box" style={{padding:0}}>
+            <div style={{width:"100%",height:200,background:"#f0fdf4",position:"relative",borderRadius:"24px 24px 0 0",overflow:"hidden"}}>
+              {showDetail.image?<img src={showDetail.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:60}}>🏷️</div>}
+              <button onClick={()=>setShowDetail(null)} style={{position:"absolute",top:12,right:12,background:"rgba(255,255,255,.9)",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+              <div style={{position:"absolute",top:12,left:12,background:"#22c55e",color:"#fff",borderRadius:10,padding:"4px 12px",fontSize:12,fontWeight:800}}>🏪 現貨</div>
+            </div>
+            <div style={{padding:"20px 20px 40px"}}>
+              <div style={{fontWeight:900,fontSize:18,color:"#2d1f1a",marginBottom:4}}>{showDetail.name}</div>
+              {showDetail.desc&&<div style={{fontSize:13,color:"#b8887a",marginBottom:14}}>{showDetail.desc}</div>}
+              <div style={{background:"#f0fdf4",borderRadius:14,padding:"12px 16px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontWeight:900,fontSize:24,color:"#22c55e"}}>NT${(showDetail.priceTWD*dQty).toLocaleString()}</div>
+                  <div style={{fontSize:12,color:"#86efac",marginTop:2}}>庫存 {showDetail.qty} 件</div>
+                </div>
+                <div style={{fontSize:28}}>✅</div>
+              </div>
+              <div style={{marginBottom:14}}>
+                <label className="LS">數量</label>
+                <div style={{display:"flex",alignItems:"center",gap:14}}>
+                  <button onClick={()=>setDQty(q=>Math.max(1,q-1))} className="tap" style={{width:40,height:40,borderRadius:12,border:"1.5px solid #f0d9cc",background:"#fff8f0",fontSize:20,cursor:"pointer",color:"#c8756a",fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>−</button>
+                  <span style={{fontWeight:900,fontSize:22,color:"#2d1f1a",minWidth:32,textAlign:"center"}}>{dQty}</span>
+                  <button onClick={()=>setDQty(q=>Math.min(showDetail.qty,q+1))} className="tap" style={{width:40,height:40,borderRadius:12,border:"1.5px solid #f0d9cc",background:"#fff8f0",fontSize:20,cursor:"pointer",color:"#c8756a",fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}>＋</button>
+                </div>
+              </div>
+              <div style={{marginBottom:20}}>
+                <label className="LS">備註（選填）</label>
+                <textarea className="IS" value={dNote} onChange={e=>setDNote(e.target.value)} placeholder="例：指定顏色款式" rows={2} style={{resize:"none"}}/>
+              </div>
+              <button onClick={()=>{
+                // Use a virtual product object for cart compatibility
+                const virtualProduct={id:`stock_${showDetail.id}`,name:showDetail.name,price:showDetail.priceTWD,currency:"TWD",customRate:1,isStock:true,stockId:showDetail.id};
+                addToCart(virtualProduct,dQty,dNote,null);
+                setShowDetail(null);
+              }} className="tap btn-blue" style={{width:"100%",fontSize:15}}>
+                加入購物車 🛒
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProductsTab({products,setProducts,sellRates,liveRates,setShowPF,setEditP,setPForm,pImg,openEditP}){
+  const [pSearch,setPSearch]=useState("");
+  const filteredP=products.filter(p=>!pSearch||p.name.toLowerCase().includes(pSearch.toLowerCase()));
+  return(
+    <>
+      <div style={{display:"flex",gap:10,marginBottom:14,alignItems:"center"}}>
+        <button onClick={()=>{setShowPF(true);setEditP(null);setPForm({name:"",price:"",currency:"JPY",category:"美妝保養",desc:"",inStock:true,rateType:"general",keepShell:false,customRate:""});pImg.setImg(null);}} className="tap"
+          style={{background:"linear-gradient(135deg,#c8756a,#e0957a)",color:"#fff",border:"none",borderRadius:22,padding:"9px 18px",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit",boxShadow:"0 2px 10px rgba(200,117,106,.3)",whiteSpace:"nowrap"}}>＋ 新增商品</button>
+        <div style={{position:"relative",flex:1}}>
+          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"#b8887a"}}>🔍</span>
+          <input className="IS" value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="搜尋商品..." style={{paddingLeft:36,paddingTop:9,paddingBottom:9}}/>
+          {pSearch&&<button onClick={()=>setPSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:"#d4a898"}}>×</button>}
+        </div>
+      </div>
+      <div className="grid2">
+        {filteredP.length===0&&<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898",gridColumn:"span 2"}}><div style={{fontSize:36}}>{pSearch?"🔍":"📦"}</div><div style={{fontWeight:700,marginTop:8}}>{pSearch?`找不到「${pSearch}」`:"還沒有商品"}</div></div>}
+        {filteredP.map(p=>{
+          const sell=productTWD(p,sellRates);
+          return(
+            <div key={p.id} className="card" style={{overflow:"hidden",opacity:p.inStock?1:.7}}>
+              <div style={{width:"100%",height:110,background:"#fff8f0",position:"relative",overflow:"hidden"}}>
+                {p.image?<img src={p.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  :<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,color:"#d4a898"}}>{CAT_ICON[p.category]||"📦"}</div>}
+                <div style={{position:"absolute",top:6,left:6,background:p.inStock?"#22c55e":"#94a3b8",color:"#fff",borderRadius:8,padding:"2px 8px",fontSize:10,fontWeight:800}}>{p.inStock?"販售中":"已下架"}</div>
+                {p.rateType&&p.rateType!=="general"&&<div style={{position:"absolute",top:6,right:6,background:RATE_TYPES[p.rateType]?.color,color:"#fff",borderRadius:8,padding:"2px 6px",fontSize:10,fontWeight:700}}>{RATE_TYPES[p.rateType]?.label}</div>}
+              </div>
+              <div style={{padding:"10px 12px"}}>
+                <div style={{fontWeight:800,fontSize:13,color:"#2d1f1a",marginBottom:2}}>{p.name}</div>
+                <div style={{fontWeight:900,color:"#b5622e",fontSize:13,marginBottom:8}}>NT${sell.toLocaleString()}</div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>setProducts(pr=>pr.map(x=>x.id===p.id?{...x,inStock:!x.inStock}:x))} className="tap" style={{flex:1,padding:"5px 0",borderRadius:8,border:`1.5px solid ${p.inStock?"#fee2e2":"#f0d9cc"}`,background:p.inStock?"#fff8f8":"#fffaf5",fontSize:11,cursor:"pointer",fontWeight:700,color:p.inStock?"#f87171":"#c8756a",fontFamily:"inherit"}}>{p.inStock?"下架":"上架"}</button>
+                  <button onClick={()=>openEditP(p)} className="tap" style={{flex:1,padding:"5px 0",borderRadius:8,border:"1.5px solid #f0d9cc",background:"#fffaf5",fontSize:11,cursor:"pointer",fontWeight:700,color:"#c8756a",fontFamily:"inherit"}}>✏️</button>
+                  <button onClick={()=>setProducts(pr=>pr.filter(x=>x.id!==p.id))} className="tap" style={{flex:1,padding:"5px 0",borderRadius:8,border:"1.5px solid #fee2e2",background:"#fff8f8",fontSize:11,cursor:"pointer",fontWeight:700,color:"#f87171",fontFamily:"inherit"}}>🗑️</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function SettingsTab({announce,setAnnounce,showToast}){
+  const [aTitle,setATitle]=useState(announce?.title||"");
+  const [aBody,setABody]=useState(announce?.body||"");
+  return(
+    <div>
+      <div className="card" style={{padding:22,marginBottom:16}}>
+        <div style={{fontWeight:900,fontSize:16,color:"#2d1f1a",marginBottom:4}}>📢 公告設定</div>
+        <div style={{fontSize:12,color:"#b8887a",marginBottom:16}}>設定後首頁公告即時更新，客人看得到</div>
+        <div style={{marginBottom:13}}>
+          <label className="LS">公告標題</label>
+          <input className="IS" value={aTitle} onChange={e=>setATitle(e.target.value)} placeholder="例：🇯🇵 日本連線開跑！"/>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label className="LS">公告內容</label>
+          <textarea className="IS" value={aBody} onChange={e=>setABody(e.target.value)} rows={6}
+            placeholder={"例：\n📅 出發日期：5/10\n✈️ 回台日期：5/17\n💰 收單截止：5/8 晚上12點\n\n有任何問題歡迎私訊！"}
+            style={{resize:"vertical",lineHeight:1.8}}/>
+        </div>
+        {(aTitle||aBody)&&(
+          <div style={{background:"#fff8ee",border:"1.5px solid #f0c070",borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontSize:11,color:"#c8a090",fontWeight:700,marginBottom:6,letterSpacing:1}}>👁️ 預覽</div>
+            <div style={{fontSize:14,fontWeight:800,color:"#2d1f1a"}}>{aTitle}</div>
+            {aBody&&<div style={{fontSize:12,color:"#8a6a5a",marginTop:4,whiteSpace:"pre-line",lineHeight:1.7}}>{aBody}</div>}
+          </div>
+        )}
+        <button onClick={()=>{setAnnounce({title:aTitle,body:aBody});showToast("公告已更新！客人首頁即時生效 📢");}} className="tap btn-blue" style={{width:"100%",fontSize:15}}>
+          💾 儲存並發布公告
+        </button>
+      </div>
+
+      {/* 儲存空間管理 */}
+      <div className="card" style={{padding:22}}>
+        <div style={{fontWeight:900,fontSize:16,color:"#2d1f1a",marginBottom:4}}>🗄️ 儲存空間管理</div>
+        <div style={{fontSize:12,color:"#b8887a",marginBottom:16}}>如果新增資料一直消失，表示空間快滿了，可以清除圖片釋放空間</div>
+        {(()=>{
+          const used=Object.keys(localStorage).filter(k=>k.startsWith("shoptrack_")).reduce((s,k)=>s+(localStorage.getItem(k)||"").length,0);
+          const usedKB=Math.round(used/1024);
+          const pct=Math.min(100,Math.round(usedKB/5120*100));
+          return(
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}>
+                <span style={{color:"#8a6a5a"}}>已使用</span>
+                <span style={{fontWeight:700,color:pct>80?"#e11d48":"#2d1f1a"}}>{usedKB} KB / 5120 KB</span>
+              </div>
+              <div style={{height:10,background:"#f0d9cc",borderRadius:6,marginBottom:16,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,background:pct>80?"#e11d48":pct>60?"#f59e0b":"#22c55e",borderRadius:6,transition:"width .5s"}}/>
+              </div>
+            </div>
+          );
+        })()}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <button onClick={()=>{
+            if(!window.confirm("確定要清除所有訂單圖片嗎？文字資料不受影響。")) return;
+            setOrders(orders.map(o=>({...o,image:null})));
+            showToast("已清除訂單圖片 🗑️");
+          }} className="tap" style={{padding:"11px",borderRadius:12,border:"1.5px solid #f0d9cc",background:"#fff8f0",fontWeight:700,fontSize:13,cursor:"pointer",color:"#c8756a",fontFamily:"inherit"}}>
+            🖼️ 清除所有訂單圖片（釋放空間）
+          </button>
+          <button onClick={()=>{
+            if(!window.confirm("確定要刪除所有「已到台灣」的舊訂單嗎？此操作無法復原。")) return;
+            const kept=orders.filter(o=>o.status!=="arrived");
+            setOrders(kept);
+            showToast(`已刪除 ${orders.length-kept.length} 筆完成訂單 🗑️`);
+          }} className="tap" style={{padding:"11px",borderRadius:12,border:"1.5px solid #fee2e2",background:"#fff8f8",fontWeight:700,fontSize:13,cursor:"pointer",color:"#f87171",fontFamily:"inherit"}}>
+            🗑️ 清除已完成的舊訂單（已到台灣）
+          </button>
+          <button onClick={()=>{
+            if(!window.confirm("確定要刪除所有「已取消」的訂單嗎？此操作無法復原。")) return;
+            const kept=orders.filter(o=>o.status!=="cancelled");
+            setOrders(kept);
+            showToast(`已刪除 ${orders.length-kept.length} 筆取消訂單 🗑️`);
+          }} className="tap" style={{padding:"11px",borderRadius:12,border:"1.5px solid #fee2e2",background:"#fff8f8",fontWeight:700,fontSize:13,cursor:"pointer",color:"#f87171",fontFamily:"inherit"}}>
+            ❌ 清除已取消的訂單
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentDash({orders,setOrders,clients,setClients,products,setProducts,onLogout,liveRates,sellRates,setSellRates,wallets,setWallets,wishlists,setWishlists,pending,setPending,announce,setAnnounce,stockItems,setStockItems}){
+  const [tab,setTab]=useState("orders");
+  const [fStatus,setFStatus]=useState("all");
+  const [viewMode,setViewMode]=useState("list");
+  const [billingClient,setBillingClient]=useState(null);
+  const [batchProduct,setBatchProduct]=useState(null);
+  const [batchRows,setBatchRows]=useState({});
+  const [selectedIds,setSelectedIds]=useState(new Set()); // 批次郵寄勾選
+  const [showOF,setShowOF]=useState(false);const [editO,setEditO]=useState(null);
+  const [showPF,setShowPF]=useState(false);const [editP,setEditP]=useState(null);
+  const [editingR,setEditingR]=useState(false);const [tempSell,setTempSell]=useState({...sellRates});
+  const [newCName,setNewCName]=useState("");
+  const [oForm,setOForm]=useState({clientName:"",clientCode:"",item:"",price:"",currency:"JPY",note:"",status:"pending",rateType:"general"});
+  const [pForm,setPForm]=useState({name:"",price:"",currency:"JPY",category:"美妝保養",desc:"",inStock:true,rateType:"general",keepShell:false,customRate:""});
+  const [toast,showToast]=useToast();
+  const pImg=useImg();
+  const oImg=useImg();
+
+  const filtered=orders.filter(o=>fStatus==="all"||o.status===fStatus);
+  const totalProfit=orders.reduce((s,o)=>s+(productTWD(o,sellRates)-toTWD(o.price,o.currency,liveRates)),0);
+  const totalJPY=orders.filter(o=>o.currency==="JPY"||!o.currency).reduce((s,o)=>s+o.price,0);
+  const totalRevenueTWD=orders.reduce((s,o)=>s+productTWD(o,sellRates),0);
+  const stats={total:orders.length,pending:orders.filter(o=>o.status==="pending").length,bought:orders.filter(o=>o.status==="bought").length};
+
+  function submitO(){
+    if(!oForm.clientName||!oForm.item||!oForm.price){showToast("請填寫必填欄位","error");return;}
+    const now=new Date().toISOString().split("T")[0];
+    const c=clients.find(x=>x.name===oForm.clientName);
+    const entry={...oForm,clientCode:c?.clientCode||oForm.clientCode||"",price:+oForm.price,image:oImg.img||null};
+    if(editO){setOrders(p=>p.map(o=>o.id===editO.id?{...o,...entry,updatedAt:now}:o));showToast("已更新 ✨");}
+    else{setOrders(p=>[...p,{id:Date.now(),...entry,createdAt:now,updatedAt:now}]);showToast("已新增 🎉");}
+    setShowOF(false);setEditO(null);oImg.setImg(null);
+    setOForm({clientName:"",clientCode:"",item:"",price:"",currency:"JPY",note:"",status:"pending",rateType:"general"});
+  }
+  function submitP(){
+    if(!pForm.name){showToast("請填寫商品名稱","error");return;}
+    if(pForm.rateType==="gacha"&&!pForm.price){showToast("請選擇扭蛋定價","error");return;}
+    const cr=pForm.customRate?+pForm.customRate:undefined;
+    const pr=pForm.rateType==="gacha"?+pForm.price:0;
+    const rateKey=pForm.rateType==="group"?(pForm.groupRateType||"general"):pForm.rateType;
+    if(editP){setProducts(p=>p.map(x=>x.id===editP.id?{...x,...pForm,price:pr,customRate:cr,rateType:pForm.rateType,groupRateType:rateKey,image:pImg.img??x.image}:x));showToast("已更新 ✨");}
+    else{setProducts(p=>[...p,{id:Date.now(),...pForm,price:pr,customRate:cr,rateType:pForm.rateType,groupRateType:rateKey,currency:"JPY",image:pImg.img}]);showToast("已新增 🎉");}
+    setShowPF(false);setEditP(null);pImg.setImg(null);
+    setPForm({name:"",price:"",currency:"JPY",category:"美妝保養",desc:"",inStock:true,rateType:"general",keepShell:false,customRate:"",groupRateType:"general"});
+  }
+  function openEditO(o){setEditO(o);setOForm({...o,price:String(o.price)});setShowOF(true);}
+  function openEditP(p){setEditP(p);setPForm({...p,price:String(p.price),customRate:p.customRate?String(p.customRate):"",rateType:p.rateType||"general",keepShell:p.keepShell||false,groupRateType:p.groupRateType||"general"});pImg.setImg(p.image);setShowPF(true);}
+  function chStatus(id,s){
+    const order=orders.find(o=>o.id===id);
+    setOrders(p=>p.map(o=>o.id===id?{...o,status:s,updatedAt:new Date().toISOString().split("T")[0]}:o));
+    showToast(`${STATUS[s].icon} ${STATUS[s].label}`);
+    // 業者確認「已買到」時才從購物金扣款（只扣一次）
+    if(s==="bought"&&order&&!order.walletDeducted){
+      const client=clients.find(c=>c.clientCode===order.clientCode);
+      if(!client) return;
+      const w=wallets[client.clientCode]||{balance:0,logs:[]};
+      const cost=productTWD(order,sellRates);
+      if(cost>0&&(w.balance||0)>=cost){
+        const now=new Date().toISOString().split("T")[0];
+        setWallets(p=>({...p,[client.clientCode]:{balance:(w.balance||0)-cost,
+          logs:[...(w.logs||[]),{id:Date.now(),date:now,type:"deduct",amount:-cost,note:`確認扣款：${order.item}`}]}}));
+        setOrders(p=>p.map(o=>o.id===id?{...o,walletDeducted:true}:o));
+        showToast(`💰 已從 ${client.name} 購物金扣除 NT$${cost.toLocaleString()}`);
+      }
+    }
+    // 取消訂單時退款（若已扣款）
+    if(s==="cancelled"&&order&&order.walletDeducted){
+      const client=clients.find(c=>c.clientCode===order.clientCode);
+      if(!client) return;
+      const w=wallets[client.clientCode]||{balance:0,logs:[]};
+      const cost=productTWD(order,sellRates);
+      if(cost>0){
+        const now=new Date().toISOString().split("T")[0];
+        setWallets(p=>({...p,[client.clientCode]:{balance:(w.balance||0)+cost,
+          logs:[...(w.logs||[]),{id:Date.now(),date:now,type:"add",amount:cost,note:`取消退款：${order.item}`}]}}));
+        setOrders(p=>p.map(o=>o.id===id?{...o,walletDeducted:false}:o));
+        showToast(`💰 已退款 NT$${cost.toLocaleString()} 給 ${client.name}`);
+      }
+    }
+  }
+  function delOrder(id){
+    const order=orders.find(o=>o.id===id);
+    // 若已扣款，退還購物金
+    if(order&&order.walletDeducted){
+      const client=clients.find(c=>c.clientCode===order.clientCode);
+      if(client){
+        const w=wallets[client.clientCode]||{balance:0,logs:[]};
+        const cost=productTWD(order,sellRates);
+        const now=new Date().toISOString().split("T")[0];
+        setWallets(p=>({...p,[client.clientCode]:{balance:(w.balance||0)+cost,
+          logs:[...(w.logs||[]),{id:Date.now(),date:now,type:"add",amount:cost,note:`退款：${order.item}`}]}}));
+        showToast(`💰 已退款 NT$${cost.toLocaleString()} 給 ${client.name}`);
+      }
+    }
+    setOrders(p=>p.filter(o=>o.id!==id));
+  }
+  function addClient(){
+    if(!newCName.trim()){showToast("請填寫群組暱稱","error");return;}
+    if(clients.find(c=>c.name===newCName.trim())){showToast("此暱稱已存在","error");return;}
+    const code=`A${String(clients.length+1).padStart(3,"0")}`;
+    setClients(p=>[...p,{clientCode:code,name:newCName.trim()}]);setNewCName("");showToast(`已新增 🎉`);
+  }
+
+  const reviewCount=orders.filter(o=>o.status==="pending_review").length;
+  const TABS=[{key:"orders",label:"訂單管理"},{key:"review",label:`審核${reviewCount>0?` (${reviewCount})`:""}`},{key:"batch",label:"📦 批次下單"},{key:"products",label:"代購目錄"},{key:"stock",label:"🏪 現貨"},{key:"wish",label:"許願清單"},{key:"lottery",label:"🎟️ 抽獎券"},{key:"exchange",label:"匯率設定"},{key:"clients",label:"客人管理"},{key:"history",label:"歷程"},{key:"settings",label:"⚙️ 設定"}];
+
+  return(
+    <div style={{minHeight:"100vh",paddingBottom:48}}>
+      <Toast t={toast}/>
+      <div style={{margin:"14px 16px 0",background:"#fff8ee",border:"1.5px solid #f0c070",borderRadius:16,padding:"12px 16px"}}>
+        <div style={{fontSize:12,color:"#a0622e",fontWeight:700,marginBottom:3}}>📜 最新公告</div>
+        <div style={{fontSize:15,fontWeight:900,color:"#1a1a1a"}}>{announce?.title||"歡迎使用代購管理系統"}</div>
+        {announce?.body&&<div style={{fontSize:13,color:"#7a4a22",marginTop:2,whiteSpace:"pre-line"}}>{announce.body}</div>}
+      </div>
+      <div className="card" style={{margin:"12px 16px",padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:42,height:42,borderRadius:13,background:"linear-gradient(135deg,#f5c89a,#e8956a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>👑</div>
+          <div><div style={{fontWeight:900,fontSize:16,color:"#2d1f1a"}}>業者後台</div><div style={{fontSize:12,color:"#b8887a"}}>admin</div></div>
+        </div>
+        <button onClick={onLogout} className="tap" style={{padding:"7px 14px",borderRadius:20,border:"1.5px solid #f0d9cc",background:"#fffaf5",color:"#b8887a",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>登出</button>
+      </div>
+      <div style={{margin:"0 16px",borderBottom:"1.5px solid #f0d9cc",display:"flex",gap:12,overflowX:"auto"}}>
+        {TABS.map(t=><button key={t.key} className={`tab-btn ${tab===t.key?"active":""}`} onClick={()=>setTab(t.key)}>{t.label}</button>)}
+      </div>
+
+      <div style={{padding:"16px 16px 0"}}>
+        {/* Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:14}}>
+          {[
+            {label:"總訂單",v:stats.total,icon:"📋",c:"#c8756a"},
+            {label:"待購買",v:stats.pending,icon:"⏳",c:"#f59e0b"},
+            {label:"已買到",v:stats.bought,icon:"✅",c:"#22c55e"},
+            {label:"總日幣",v:`¥${totalJPY.toLocaleString()}`,icon:"💴",c:"#7e22ce",sm:true},
+            {label:"總營收(台幣)",v:`NT$${totalRevenueTWD.toLocaleString()}`,icon:"💰",c:"#c8756a",sm:true},
+            {label:"預估利潤",v:`NT$${Math.abs(totalProfit).toLocaleString()}`,icon:"📈",c:"#16a34a",sm:true},
+          ].map(s=>(
+            <div key={s.label} className="card" style={{padding:"12px 8px",textAlign:"center"}}>
+              <div style={{fontSize:18}}>{s.icon}</div>
+              <div style={{fontSize:s.sm?12:22,fontWeight:900,color:s.c,lineHeight:1.2,marginTop:2}}>{s.v}</div>
+              <div style={{fontSize:10,color:"#b8887a",fontWeight:700,marginTop:3}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ORDERS */}
+        {tab==="orders"&&(
+          <>
+            {/* 工具列 */}
+            <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+              <button onClick={()=>{setShowOF(true);setEditO(null);setOForm({clientName:"",item:"",price:"",currency:"JPY",note:"",status:"pending"});}} className="tap"
+                style={{background:"linear-gradient(135deg,#c8756a,#e0957a)",color:"#fff",border:"none",borderRadius:22,padding:"9px 18px",fontWeight:800,cursor:"pointer",fontSize:13,fontFamily:"inherit",boxShadow:"0 2px 10px rgba(200,117,106,.3)"}}>＋ 新增訂單</button>
+              {/* 批次郵寄按鈕 */}
+              {selectedIds.size>0&&(
+                <>
+                  <span style={{fontSize:12,color:"#3b82f6",fontWeight:700}}>已選 {selectedIds.size} 筆</span>
+                  <button onClick={()=>{
+                    setOrders(p=>p.map(o=>selectedIds.has(o.id)?{...o,mailShipping:true,shippingFee:o.shippingFee||0}:o));
+                    showToast(`已標記 ${selectedIds.size} 筆為郵寄 ✈️`);
+                    setSelectedIds(new Set());
+                  }} className="tap"
+                    style={{padding:"7px 14px",borderRadius:12,border:"none",background:"#3b82f6",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                    ✈️ 批次標記郵寄（0.25）
+                  </button>
+                  <button onClick={()=>{
+                    setOrders(p=>p.map(o=>selectedIds.has(o.id)?{...o,mailShipping:false,shippingFee:0}:o));
+                    showToast(`已取消 ${selectedIds.size} 筆郵寄標記`);
+                    setSelectedIds(new Set());
+                  }} className="tap"
+                    style={{padding:"7px 14px",borderRadius:12,border:"1.5px solid #f0d9cc",background:"#fff8f0",color:"#c8756a",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                    取消郵寄
+                  </button>
+                  <button onClick={()=>setSelectedIds(new Set())} className="tap"
+                    style={{padding:"7px 12px",borderRadius:12,border:"1.5px solid #e0e0e0",background:"#f5f5f5",color:"#888",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                    取消選取
+                  </button>
+                </>
+              )}
+              {/* 檢視切換 */}
+              <div style={{display:"flex",background:"#fff8f0",borderRadius:12,padding:3,gap:2,marginLeft:"auto"}}>
+                {[["list","📋"],["byClient","👤"],["byProduct","📦"]].map(([m,l])=>(
+                  <button key={m} onClick={()=>setViewMode(m)} className="tap"
+                    style={{padding:"6px 10px",borderRadius:9,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit",
+                      background:viewMode===m?"#c8756a":"transparent",color:viewMode===m?"#fff":"#b8887a"}}>{l}</button>
+                ))}
+              </div>
+            </div>
+            {/* 列表模式：全選按鈕 */}
+            {viewMode==="list"&&filtered.length>0&&(
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <button onClick={()=>{
+                  if(selectedIds.size===filtered.length) setSelectedIds(new Set());
+                  else setSelectedIds(new Set(filtered.map(o=>o.id)));
+                }} className="tap"
+                  style={{padding:"5px 12px",borderRadius:10,border:"1.5px solid #f0d9cc",background:"#fff8f0",fontSize:12,fontWeight:700,cursor:"pointer",color:"#c8756a",fontFamily:"inherit"}}>
+                  {selectedIds.size===filtered.length?"取消全選":"全選"}
+                </button>
+                <span style={{fontSize:11,color:"#b8887a"}}>勾選後可批次標記郵寄</span>
+              </div>
+            )}
+            {/* 狀態篩選（列表模式才顯示）*/}
+            {viewMode==="list"&&(
+              <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+                {[["all","全部"],...Object.entries(STATUS).map(([k,v])=>[k,v.label])].map(([k,l])=>(
+                  <button key={k} onClick={()=>setFStatus(k)} className="tap"
+                    style={{padding:"7px 12px",borderRadius:16,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit",background:fStatus===k?"#c8756a":"#fff8f0",color:fStatus===k?"#fff":"#7ab3d0"}}>{l}</button>
+                ))}
+              </div>
+            )}
+
+            {/* ── 列表模式 ── */}
+            {viewMode==="list"&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {filtered.length===0&&<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>📋</div><div style={{fontWeight:700,marginTop:8}}>沒有訂單</div></div>}
+                {filtered.map(o=>{
+                  const s=STATUS[o.status];
+                  const clientData=clients.find(c=>c.clientCode===o.clientCode||c.name===o.clientName);
+                  const w=clientData?wallets[clientData.clientCode]||{balance:0,logs:[]}:{balance:0,logs:[]};
+                  const totalDep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+                  const level=getMemberLevel(totalDep);
+                  const isMail=!!o.mailShipping;
+                  // 依會員等級和商品類型計算售價
+                  let sell;
+                  if(isMail){
+                    sell=Math.ceil(o.price*0.25)+(o.shippingFee||0);
+                  } else if(o.rateType==="gacha"){
+                    sell=gachaTWD(o.price,o.keepShell);
+                  } else if(o.rateType==="ticket"){
+                    sell=Math.ceil(o.price*level.ticketRate);
+                  } else if(o.rateType==="souvenir"){
+                    sell=Math.ceil(o.price*level.souvenirRate);
+                  } else if(o.customRate){
+                    sell=Math.ceil(o.price*o.customRate);
+                  } else {
+                    sell=Math.ceil(o.price*0.26);
+                  }
+                  const cashbackAmt=(o.rateType!=="gacha"&&level.cashback>0)?Math.ceil(sell*level.cashback):0;
+                  const finalSell=sell-cashbackAmt;
+                  const cost=toTWD(o.price,o.currency,liveRates);
+                  const pft=finalSell-cost;
+                  const isSelected=selectedIds.has(o.id);
+                  return(
+                    <div key={o.id} className="card" style={{overflow:"hidden",border:isSelected?"2px solid #3b82f6":isMail?"2px solid #60a5fa":"none"}}>
+                      {o.image&&<img src={o.image} alt="" style={{width:"100%",height:120,objectFit:"cover"}}/>}
+                      <div style={{padding:14}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                          {/* 勾選框 */}
+                          <button onClick={()=>setSelectedIds(p=>{const n=new Set(p);n.has(o.id)?n.delete(o.id):n.add(o.id);return n;})} className="tap"
+                            style={{width:24,height:24,borderRadius:6,border:`2px solid ${isSelected?"#3b82f6":"#d0c0b8"}`,
+                              background:isSelected?"#3b82f6":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginRight:10,marginTop:2}}>
+                            {isSelected&&<span style={{color:"#fff",fontSize:12,fontWeight:900}}>✓</span>}
+                          </button>
+                          <div style={{flex:1}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                              <span className="chip" style={{background:s.bg,color:s.color}}>{s.icon} {s.label}</span>
+                              <span style={{color:"#d4a898",fontSize:11}}>{o.clientName}</span>
+                              <span style={{fontSize:11,fontWeight:700,color:level.color}}>{level.icon}{level.name}</span>
+                              {isMail&&<span style={{background:"#eff6ff",borderRadius:8,padding:"1px 6px",fontSize:10,color:"#3b82f6",fontWeight:800}}>✈️ 郵寄</span>}
+                              {cashbackAmt>0&&<span style={{background:"#f0fdf4",borderRadius:8,padding:"1px 6px",fontSize:10,color:"#16a34a",fontWeight:700}}>回饋 -NT${cashbackAmt}</span>}
+                            </div>
+                            <div style={{fontWeight:900,fontSize:15,color:"#2d1f1a",marginBottom:6}}>{o.item}</div>
+                            <div style={{display:"flex",gap:8,flexWrap:"wrap",fontSize:12}}>
+                              <span style={{background:"#fff8f0",borderRadius:8,padding:"3px 8px",color:"#c8756a",fontWeight:700}}>成本 NT${cost.toLocaleString()}</span>
+                              <span className="gold" style={{background:"#fff8ee",borderRadius:8,padding:"3px 8px"}}>售 NT${finalSell.toLocaleString()}</span>
+                              <span style={{background:pft>=0?"#f0fdf4":"#fff1f1",borderRadius:8,padding:"3px 8px",color:pft>=0?"#16a34a":"#e11d48",fontWeight:800}}>{pft>=0?"↑":"↓"} NT${pft.toLocaleString()}</span>
+                            </div>
+                            {isMail&&<div style={{marginTop:6,display:"flex",alignItems:"center",gap:8}}>
+                              <span style={{fontSize:12,color:"#3b82f6",fontWeight:700}}>✈️ 運費：</span>
+                              <input type="number" value={o.shippingFee||""} placeholder="輸入運費"
+                                onChange={e=>setOrders(p=>p.map(x=>x.id===o.id?{...x,shippingFee:+e.target.value}:x))}
+                                style={{width:90,padding:"4px 8px",borderRadius:8,border:"1.5px solid #93c5fd",fontSize:12,fontFamily:"inherit",outline:"none"}}/>
+                              <span style={{fontSize:11,color:"#8aabcc"}}>NT$</span>
+                            </div>}
+                            {o.note&&<div style={{marginTop:8,background:"#fffaf5",borderRadius:10,padding:"6px 10px",fontSize:12,color:"#8a6a5a"}}>📝 {o.note}</div>}
+                            <div style={{marginTop:6,color:"#c8dde8",fontSize:11}}>更新：{o.updatedAt}</div>
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:6,marginLeft:10}}>
+                            <select value={o.status} onChange={e=>chStatus(o.id,e.target.value)} style={{padding:"6px 8px",borderRadius:10,border:"1.5px solid #f0d9cc",fontSize:11,cursor:"pointer",background:"#fffaf5",fontWeight:700,color:"#c8756a",fontFamily:"inherit"}}>
+                              {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+                            </select>
+                            <button onClick={()=>setOrders(p=>p.map(x=>x.id===o.id?{...x,mailShipping:!x.mailShipping,shippingFee:0}:x))} className="tap"
+                              style={{padding:"6px 10px",borderRadius:10,border:`1.5px solid ${isMail?"#93c5fd":"#f0d9cc"}`,background:isMail?"#eff6ff":"#fffaf5",fontSize:11,cursor:"pointer",fontWeight:700,color:isMail?"#3b82f6":"#c8756a",fontFamily:"inherit"}}>
+                              ✈️
+                            </button>
+                            <button onClick={()=>setBillingClient(clientData||{name:o.clientName})} className="tap"
+                              style={{padding:"6px 10px",borderRadius:10,border:"1.5px solid #e9d5ff",background:"#fdf4ff",fontSize:11,cursor:"pointer",fontWeight:700,color:"#a855f7",fontFamily:"inherit"}}>
+                              📊
+                            </button>
+                            <button onClick={()=>openEditO(o)} className="tap" style={{padding:"6px 10px",borderRadius:10,border:"1.5px solid #f0d9cc",background:"#fffaf5",fontSize:12,cursor:"pointer",fontWeight:700,color:"#c8756a",fontFamily:"inherit"}}>✏️</button>
+                            <button onClick={()=>delOrder(o.id)} className="tap" style={{padding:"6px 10px",borderRadius:10,border:"1.5px solid #fee2e2",background:"#fff8f8",fontSize:12,cursor:"pointer",fontWeight:700,color:"#f87171",fontFamily:"inherit"}}>🗑️</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── 按客人分組模式 ── */}
+            {viewMode==="byClient"&&(()=>{
+              // 有訂單的客人
+              const clientsWithOrders = clients.filter(c=>orders.some(o=>o.clientCode===c.clientCode||o.clientName===c.name));
+              if(clientsWithOrders.length===0) return <div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>📋</div><div style={{fontWeight:700,marginTop:8}}>沒有訂單</div></div>;
+              return(
+                <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                  {clientsWithOrders.map(c=>{
+                    const cOrders=orders.filter(o=>(o.clientCode===c.clientCode||o.clientName===c.name)&&o.status!=="cancelled");
+                    const w=wallets[c.clientCode]||{balance:0,logs:[]};
+                    const totalDep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+                    const level=getMemberLevel(totalDep);
+                    const totalAmt=cOrders.reduce((s,o)=>s+productTWD(o,sellRates),0);
+                    const pendingN=cOrders.filter(o=>o.status==="pending").length;
+                    return(
+                      <div key={c.clientCode}>
+                        {/* 客人標題列 */}
+                        <div style={{background:`linear-gradient(135deg,${level.color}22,${level.color}11)`,border:`1.5px solid ${level.color}44`,borderRadius:16,padding:"12px 16px",marginBottom:8}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{width:36,height:36,borderRadius:11,background:level.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{level.icon}</div>
+                              <div>
+                                <div style={{fontWeight:900,fontSize:16,color:"#2d1f1a"}}>{c.name}</div>
+                                <div style={{fontSize:12,color:level.color,fontWeight:700}}>{level.name} · 回饋{level.cashback>0?`${level.cashback*100}%`:"無"} · 門票{level.ticketRate} · 土產{level.souvenirRate}</div>
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right"}}>
+                              <div style={{fontWeight:900,color:"#c8756a",fontSize:16}}>NT${totalAmt.toLocaleString()}</div>
+                              <div style={{fontSize:11,color:"#d4a898"}}>{cOrders.length}筆 {pendingN>0&&<span style={{color:"#f59e0b",fontWeight:700}}>· 待購{pendingN}筆</span>}</div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* 該客人的訂單 */}
+                        <div style={{display:"flex",flexDirection:"column",gap:8,paddingLeft:8}}>
+                          {cOrders.map(o=>{
+                            const s=STATUS[o.status];
+                            const sell=productTWD(o,sellRates);
+                            return(
+                              <div key={o.id} className="card" style={{overflow:"hidden"}}>
+                                {o.image&&<img src={o.image} alt="" style={{width:"100%",height:80,objectFit:"cover"}}/>}
+                                <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                                  <span style={{fontSize:20,flexShrink:0}}>{s.icon}</span>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontWeight:800,fontSize:14,color:"#2d1f1a",marginBottom:2}}>{o.item}</div>
+                                    <div style={{display:"flex",gap:6,fontSize:11,flexWrap:"wrap"}}>
+                                      <span style={{color:"#c8756a",fontWeight:700}}>NT${sell.toLocaleString()}</span>
+                                      <span style={{color:"#d4a898"}}>{s.label}</span>
+                                      {o.note&&<span style={{color:"#8a6a5a"}}>📝 {o.note}</span>}
+                                    </div>
+                                  </div>
+                                  <select value={o.status} onChange={e=>chStatus(o.id,e.target.value)}
+                                    style={{padding:"5px 6px",borderRadius:9,border:"1.5px solid #f0d9cc",fontSize:11,cursor:"pointer",background:"#fffaf5",fontWeight:700,color:"#c8756a",fontFamily:"inherit",flexShrink:0}}>
+                                    {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v.icon}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* ── 按商品分組模式 ── */}
+            {viewMode==="byProduct"&&(()=>{
+              // 把所有訂單按商品名稱分組
+              const groups = {};
+              orders.forEach(o=>{
+                const key = o.item||"未命名商品";
+                if(!groups[key]) groups[key]=[];
+                groups[key].push(o);
+              });
+              const groupKeys = Object.keys(groups);
+              if(groupKeys.length===0) return <div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>📦</div><div style={{fontWeight:700,marginTop:8}}>沒有訂單</div></div>;
+              return(
+                <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                  {groupKeys.map(itemName=>{
+                    const gOrders=groups[itemName];
+                    const totalQty=gOrders.length;
+                    const totalAmt=gOrders.reduce((s,o)=>s+productTWD(o,sellRates),0);
+                    const pendingN=gOrders.filter(o=>o.status==="pending").length;
+                    const boughtN=gOrders.filter(o=>o.status==="bought").length;
+                    return(
+                      <div key={itemName}>
+                        {/* 商品標題 */}
+                        <div style={{background:"linear-gradient(135deg,#fff8f0,#fde8d8)",border:"1.5px solid #f0c8b0",borderRadius:16,padding:"12px 16px",marginBottom:8}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                            <div style={{flex:1,marginRight:10}}>
+                              <div style={{fontWeight:900,fontSize:15,color:"#2d1f1a",marginBottom:4}}>{itemName}</div>
+                              <div style={{display:"flex",gap:8,fontSize:12,flexWrap:"wrap"}}>
+                                <span style={{background:"#fff",borderRadius:8,padding:"2px 8px",color:"#c8756a",fontWeight:700}}>共 {totalQty} 人</span>
+                                {pendingN>0&&<span style={{background:"#fef9ec",borderRadius:8,padding:"2px 8px",color:"#f59e0b",fontWeight:700}}>⏳ 待購 {pendingN}</span>}
+                                {boughtN>0&&<span style={{background:"#f0fdf4",borderRadius:8,padding:"2px 8px",color:"#22c55e",fontWeight:700}}>✅ 已買 {boughtN}</span>}
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right",flexShrink:0}}>
+                              <div style={{fontWeight:900,color:"#c8756a",fontSize:15}}>NT${totalAmt.toLocaleString()}</div>
+                              <div style={{fontSize:11,color:"#d4a898"}}>合計</div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* 各客人明細 */}
+                        <div style={{display:"flex",flexDirection:"column",gap:6,paddingLeft:8}}>
+                          {gOrders.map(o=>{
+                            const s=STATUS[o.status];
+                            const sell=productTWD(o,sellRates);
+                            const clientData=clients.find(c=>c.clientCode===o.clientCode||c.name===o.clientName);
+                            const w=clientData?wallets[clientData.clientCode]||{balance:0,logs:[]}:{balance:0,logs:[]};
+                            const totalDep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+                            const level=getMemberLevel(totalDep);
+                            return(
+                              <div key={o.id} className="card" style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                                <span style={{fontSize:18,flexShrink:0}}>{s.icon}</span>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                    <span style={{fontWeight:800,fontSize:14,color:"#2d1f1a"}}>{o.clientName}</span>
+                                    <span style={{fontSize:11,color:level.color,fontWeight:700}}>{level.icon}</span>
+                                  </div>
+                                  <div style={{fontSize:12,color:"#b8887a",marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
+                                    <span style={{fontWeight:700,color:"#c8756a"}}>NT${sell.toLocaleString()}</span>
+                                    {o.note&&<span>📝 {o.note}</span>}
+                                  </div>
+                                </div>
+                                <select value={o.status} onChange={e=>chStatus(o.id,e.target.value)}
+                                  style={{padding:"5px 6px",borderRadius:9,border:"1.5px solid #f0d9cc",fontSize:11,cursor:"pointer",background:"#fffaf5",fontWeight:700,color:"#c8756a",fontFamily:"inherit",flexShrink:0}}>
+                                  {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v.icon}</option>)}
+                                </select>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </>
+        )}
+
+        {/* BATCH ORDER 批次下單 */}
+        {tab==="batch"&&(()=>{
+          const now=new Date().toISOString().split("T")[0];
+          function selectProduct(p){
+            setBatchProduct(p);
+            // 初始化每個客人的勾選狀態
+            const rows={};
+            clients.forEach(c=>{rows[c.clientCode]={checked:false,note:""};});
+            setBatchRows(rows);
+          }
+          function submitBatch(){
+            if(!batchProduct) return;
+            const selected=clients.filter(c=>batchRows[c.clientCode]?.checked);
+            if(selected.length===0){showToast("請至少選一個客人","error");return;}
+            const nos=selected.map(c=>{
+              const row=batchRows[c.clientCode]||{};
+              const level=getMemberLevel((wallets[c.clientCode]?.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0));
+              return{
+                id:Date.now()+Math.random(),
+                clientCode:c.clientCode,clientName:c.name,
+                item:batchProduct.name,
+                price:row.price??batchProduct.price,
+                currency:batchProduct.currency||"JPY",
+                rateType:batchProduct.rateType||"general",
+                customRate:batchProduct.customRate,
+                keepShell:batchProduct.keepShell,
+                note:row.note||"",
+                image:null,status:"pending",
+                createdAt:now,updatedAt:now,walletDeducted:false
+              };
+            });
+            setOrders(p=>[...p,...nos]);
+            showToast(`已幫 ${selected.length} 位客人下單 🎉`);
+            setBatchProduct(null);setBatchRows({});
+          }
+
+          return(
+            <div>
+              <div style={{fontWeight:900,fontSize:16,color:"#2d1f1a",marginBottom:4}}>📦 批次下單</div>
+              <div style={{fontSize:13,color:"#b8887a",marginBottom:16}}>選一個商品，勾選客人並填備註，一次幫大家下單</div>
+
+              {/* 選商品 */}
+              <div style={{fontWeight:800,color:"#2d1f1a",fontSize:14,marginBottom:10}}>① 選擇商品</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+                {products.filter(p=>p.inStock).map(p=>{
+                  const sell=productTWD(p,sellRates);
+                  const selected=batchProduct?.id===p.id;
+                  return(
+                    <div key={p.id} onClick={()=>selectProduct(p)} className="tap"
+                      style={{background:selected?"linear-gradient(135deg,#fff8f0,#fde8d8)":"#fff",borderRadius:14,padding:"12px 16px",
+                        border:`2px solid ${selected?"#c8756a":"#f0d9cc"}`,cursor:"pointer",
+                        display:"flex",alignItems:"center",gap:12}}>
+                      {p.image&&<img src={p.image} alt="" style={{width:44,height:44,borderRadius:10,objectFit:"cover",flexShrink:0}}/>}
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:800,fontSize:14,color:"#2d1f1a"}}>{p.name}</div>
+                        <div style={{fontSize:12,color:"#b8887a",marginTop:2}}>
+                          {RATE_TYPES[p.rateType]?.label||"一般商品"} · ¥{p.price} ≈ NT${sell}
+                        </div>
+                      </div>
+                      {selected&&<span style={{fontSize:20}}>✅</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 勾選客人+備註 */}
+              {batchProduct&&(
+                <>
+                  <div style={{background:"linear-gradient(135deg,#fff8f0,#fde8d8)",borderRadius:14,padding:"12px 16px",marginBottom:16}}>
+                    <div style={{fontWeight:800,color:"#c8756a",fontSize:14}}>已選：{batchProduct.name}</div>
+                    <div style={{fontSize:12,color:"#b8887a",marginTop:2}}>NT${productTWD(batchProduct,sellRates).toLocaleString()} / 件</div>
+                  </div>
+                  <div style={{fontWeight:800,color:"#2d1f1a",fontSize:14,marginBottom:10}}>② 選擇客人 + 填備註</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+                    {clients.map(c=>{
+                      const row=batchRows[c.clientCode]||{checked:false,note:""};
+                      const w=wallets[c.clientCode]||{balance:0,logs:[]};
+                      const totalDep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+                      const level=getMemberLevel(totalDep);
+                      return(
+                        <div key={c.clientCode} className="card" style={{padding:"12px 14px",border:row.checked?"2px solid #c8756a":"none"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:row.checked?10:0}}>
+                            <button onClick={()=>setBatchRows(p=>({...p,[c.clientCode]:{...row,checked:!row.checked,price:row.price||batchProduct.price}}))} className="tap"
+                              style={{width:28,height:28,borderRadius:8,border:`2px solid ${row.checked?"#c8756a":"#d0c0b8"}`,
+                                background:row.checked?"#c8756a":"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              {row.checked&&<span style={{color:"#fff",fontSize:14,fontWeight:900}}>✓</span>}
+                            </button>
+                            <div style={{flex:1}}>
+                              <span style={{fontWeight:800,color:"#2d1f1a",fontSize:14}}>{c.name}</span>
+                              <span style={{fontSize:11,color:level.color,fontWeight:700,marginLeft:6}}>{level.icon}{level.name}</span>
+                            </div>
+                          </div>
+                          {row.checked&&(
+                            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                                <label className="LS" style={{marginBottom:0,whiteSpace:"nowrap"}}>¥ 金額</label>
+                                <input className="IS" type="number" value={row.price??batchProduct.price}
+                                  onChange={e=>setBatchRows(p=>({...p,[c.clientCode]:{...row,price:+e.target.value}}))}
+                                  style={{fontSize:13,flex:1}}/>
+                                <span style={{fontSize:12,color:"#c8756a",fontWeight:700,whiteSpace:"nowrap"}}>
+                                  ≈NT${productTWD({...batchProduct,price:row.price??batchProduct.price},sellRates).toLocaleString()}
+                                </span>
+                              </div>
+                              <input className="IS" value={row.note||""}
+                                onChange={e=>setBatchRows(p=>({...p,[c.clientCode]:{...row,note:e.target.value}}))}
+                                placeholder="備註：尺寸、顏色等..."
+                                style={{fontSize:13}}/>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{background:"#f0fdf4",borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#166534",fontWeight:700}}>
+                    已選 {clients.filter(c=>batchRows[c.clientCode]?.checked).length} 位客人
+                  </div>
+                  <button onClick={submitBatch} className="tap"
+                    style={{width:"100%",padding:14,borderRadius:14,border:"none",
+                      background:"linear-gradient(135deg,#c8756a,#e0957a)",color:"#fff",
+                      fontWeight:900,cursor:"pointer",fontSize:15,fontFamily:"inherit",
+                      boxShadow:"0 4px 14px rgba(200,117,106,.3)"}}>
+                    ✅ 確認批次下單
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* PRODUCTS */}
+        {tab==="products"&&<ProductsTab products={products} setProducts={setProducts} sellRates={sellRates} liveRates={liveRates} setShowPF={setShowPF} setEditP={setEditP} setPForm={setPForm} pImg={pImg} openEditP={openEditP}/>}
+
+        {/* STOCK */}
+        {tab==="stock"&&<StockAgentTab stockItems={stockItems} setStockItems={setStockItems} orders={orders} setOrders={setOrders} clients={clients} showToast={showToast}/>}
+
+        {/* WISHLIST */}
+        {tab==="wish"&&(
+          <div>
+            {Object.keys(wishlists).length===0||Object.values(wishlists).every(l=>l.length===0)
+              ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>⭐</div><div style={{fontWeight:700,marginTop:8}}>還沒有客人許願</div></div>
+              :<div style={{display:"flex",flexDirection:"column",gap:14}}>
+                {clients.map(c=>{
+                  const wl=wishlists[c.clientCode]||[];
+                  if(wl.length===0)return null;
+                  return(
+                    <div key={c.clientCode}>
+                      <div style={{fontWeight:800,color:"#7e22ce",fontSize:14,marginBottom:8}}>👤 {c.name} <span style={{background:"#fdf4ff",borderRadius:10,padding:"2px 8px",fontSize:12,color:"#a855f7"}}>{wl.length} 件</span></div>
+                      {wl.map(w=>(
+                        <div key={w.id} className="card" style={{overflow:"hidden",marginBottom:10}}>
+                          {w.image&&<img src={w.image} alt="" style={{width:"100%",height:120,objectFit:"cover"}}/>}
+                          <div style={{padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                            <div style={{flex:1}}>
+                              <div style={{fontWeight:800,fontSize:15,color:"#2d1f1a",marginBottom:4}}>{w.item}</div>
+                              {w.note&&<div style={{fontSize:12,color:"#b8887a",marginBottom:4}}>📝 {w.note}</div>}
+                              <div style={{fontSize:11,color:"#d4a898"}}>{w.date}</div>
+                            </div>
+                            <select value={w.status} onChange={e=>{const s=e.target.value;setWishlists(p=>({...p,[c.clientCode]:p[c.clientCode].map(x=>x.id===w.id?{...x,status:s}:x)}));}}
+                              style={{padding:"6px 8px",borderRadius:10,border:"1.5px solid #e9d5ff",fontSize:11,cursor:"pointer",background:"#fdf4ff",fontWeight:700,color:"#a855f7",fontFamily:"inherit",marginLeft:8}}>
+                              <option value="pending">⭐ 許願中</option>
+                              <option value="noted">✅ 已收到</option>
+                              <option value="found">🔍 找到了</option>
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            }
+          </div>
+        )}
+
+        {/* LOTTERY 抽獎券 */}
+        {tab==="lottery"&&(()=>{
+          const lotteryData=clients.map(c=>{
+            const cOrders=orders.filter(o=>o.clientCode===c.clientCode||o.clientName===c.name);
+            const totalSpent=cOrders.reduce((s,o)=>s+productTWD(o,sellRates),0);
+            const tickets=getLotteryTickets(totalSpent);
+            const w=wallets[c.clientCode]||{balance:0,logs:[]};
+            const totalDep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+            const level=getMemberLevel(totalDep);
+            return{c,tickets,totalSpent,level};
+          }).filter(x=>x.tickets>0).sort((a,b)=>b.tickets-a.tickets);
+
+          const totalTickets=lotteryData.reduce((s,x)=>s+x.tickets,0);
+
+          return(
+            <div>
+              {/* 總計 */}
+              <div style={{background:"linear-gradient(135deg,#fdf4ff,#e9d5ff)",borderRadius:18,padding:"18px 20px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontWeight:900,fontSize:16,color:"#7e22ce"}}>🎟️ 抽獎券總覽</div>
+                  <div style={{fontSize:12,color:"#a855f7",marginTop:2}}>每消費滿 NT$888 送 1 張</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontWeight:900,fontSize:32,color:"#7e22ce"}}>{totalTickets}</div>
+                  <div style={{fontSize:11,color:"#a855f7"}}>總張數</div>
+                </div>
+              </div>
+
+              {/* 客人列表 */}
+              {lotteryData.length===0
+                ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}>
+                  <div style={{fontSize:36}}>🎟️</div>
+                  <div style={{fontWeight:700,marginTop:8}}>還沒有人獲得抽獎券</div>
+                  <div style={{fontSize:13,color:"#b8887a",marginTop:4}}>消費滿 NT$888 即可獲得</div>
+                </div>
+                :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {lotteryData.map(({c,tickets,totalSpent,level})=>(
+                    <div key={c.clientCode} className="card" style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:44,height:44,borderRadius:13,background:`linear-gradient(135deg,${level.color}44,${level.color}22)`,
+                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+                        {level.icon}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:800,fontSize:15,color:"#2d1f1a"}}>{c.name}</div>
+                        <div style={{fontSize:12,color:"#b8887a",marginTop:2}}>
+                          累計消費 NT${totalSpent.toLocaleString()} · {level.name}
+                        </div>
+                        <div style={{marginTop:6,height:6,background:"#f0d9cc",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${Math.min(100,(totalSpent%888)/888*100)}%`,background:"#a855f7",borderRadius:3}}/>
+                        </div>
+                        <div style={{fontSize:10,color:"#b8887a",marginTop:2}}>
+                          距下一張還差 NT${888-(totalSpent%888)} 
+                        </div>
+                      </div>
+                      <div style={{textAlign:"center",flexShrink:0}}>
+                        <div style={{fontWeight:900,fontSize:28,color:"#7e22ce"}}>{tickets}</div>
+                        <div style={{fontSize:11,color:"#a855f7",fontWeight:700}}>張</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              }
+            </div>
+          );
+        })()}
+
+        {/* EXCHANGE */}
+        {tab==="exchange"&&(
+          <div className="card" style={{padding:24}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+              <div style={{fontWeight:900,fontSize:16,color:"#2d1f1a"}}>💱 匯率管理</div>
+              {!editingR&&<button onClick={()=>{setTempSell({...sellRates});setEditingR(true);}} className="tap" style={{background:"linear-gradient(135deg,#c8756a,#e0957a)",color:"#fff",border:"none",borderRadius:10,padding:"7px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>✏️ 編輯販售匯率</button>}
+              {editingR&&<div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setEditingR(false)} className="tap" style={{background:"#fff8f0",color:"#b8887a",border:"1.5px solid #f0d9cc",borderRadius:10,padding:"7px 12px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>取消</button>
+                <button onClick={()=>{setSellRates({...tempSell});setEditingR(false);showToast("匯率已更新 💰");}} className="tap" style={{background:"linear-gradient(135deg,#7cb87a,#9ed09c)",color:"#fff",border:"none",borderRadius:10,padding:"7px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>💾 儲存</button>
+              </div>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"70px 1fr 1fr 1fr",gap:8,marginBottom:10}}>
+              {["幣別","成本匯率","販售匯率","匯差%"].map((h,i)=><div key={h} style={{fontSize:11,color:["#d4a898","#c8756a","#b5622e","#16a34a"][i],fontWeight:700,textAlign:i>0?"center":"left"}}>{h}</div>)}
+            </div>
+            {CURRENCIES.filter(c=>c!=="TWD").map(c=>{
+              const cost=liveRates[c]||1,sell=sellRates[c]||cost,diff=((sell-cost)/cost*100).toFixed(1);
+              return(
+                <div key={c} style={{display:"grid",gridTemplateColumns:"70px 1fr 1fr 1fr",gap:8,alignItems:"center",marginBottom:12}}>
+                  <div><div style={{fontWeight:800,color:"#2d1f1a"}}>{c}</div></div>
+                  <div style={{background:"#fff8f0",borderRadius:10,padding:"8px",textAlign:"center"}}><div style={{fontWeight:900,color:"#c8756a"}}>{cost.toFixed(3)}</div></div>
+                  <div style={{background:"#fff8ee",borderRadius:10,padding:"8px",textAlign:"center"}}>
+                    {editingR?<input type="number" step="0.001" value={tempSell[c]||""} onChange={e=>setTempSell(p=>({...p,[c]:+e.target.value}))} style={{width:"100%",border:"1.5px solid #f0c070",borderRadius:8,padding:"4px",fontSize:14,fontWeight:900,color:"#b5622e",textAlign:"center",background:"#fff",outline:"none",fontFamily:"inherit"}}/>
+                      :<div style={{fontWeight:900,color:"#b5622e"}}>{sell.toFixed(3)}</div>}
+                  </div>
+                  <div style={{background:+diff>=0?"#f0fdf4":"#fff1f1",borderRadius:10,padding:"8px",textAlign:"center"}}><div style={{fontWeight:900,color:+diff>=0?"#16a34a":"#e11d48"}}>{+diff>=0?"+":""}{diff}%</div></div>
+                </div>
+              );
+            })}
+            <div style={{fontSize:11,color:"#d4a898",textAlign:"center",marginTop:8}}>成本匯率每 5 秒更新</div>
+          </div>
+        )}
+
+        {/* CLIENTS */}
+        {tab==="clients"&&(
+          <div>
+            <div className="card" style={{padding:20,marginBottom:14}}>
+              <div style={{fontWeight:800,fontSize:15,color:"#2d1f1a",marginBottom:12}}>＋ 新增客人</div>
+              <div style={{marginBottom:10}}><label className="LS">群組暱稱</label><input className="IS" value={newCName} onChange={e=>setNewCName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addClient()} placeholder="例：王小明"/></div>
+              <button onClick={addClient} className="tap btn-blue" style={{width:"100%",fontSize:14}}>新增</button>
+            </div>
+            <div style={{fontWeight:800,color:"#2d1f1a",fontSize:15,marginBottom:10}}>客人清單（{clients.length} 位）</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {clients.map(c=><ClientCard key={c.clientCode} c={c} orders={orders} wallets={wallets} setWallets={setWallets} setClients={setClients} showToast={showToast} onBilling={()=>setBillingClient(c)}/>)}
+            </div>
+          </div>
+        )}
+
+        {/* REVIEW - 審核客人下單金額 */}
+        {tab==="review"&&(()=>{
+          const reviewOrders=orders.filter(o=>o.status==="pending_review");
+          return(
+          <div>
+            {reviewOrders.length===0
+              ?<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>✅</div><div style={{fontWeight:700,marginTop:8}}>沒有待審核訂單</div></div>
+              :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {reviewOrders.map(o=>{
+                  const twd=productTWD(o,sellRates);
+                  return(
+                    <ReviewCard key={o.id} o={o} twd={twd} sellRates={sellRates}
+                      onApprove={(finalPrice)=>{
+                        const now=new Date().toISOString().split("T")[0];
+                        setOrders(p=>p.map(x=>x.id===o.id?{...x,price:finalPrice,status:"pending",updatedAt:now}:x));
+                        showToast(`✅ 已審核確認`);
+                      }}
+                      onReject={()=>{
+                        const now=new Date().toISOString().split("T")[0];
+                        setOrders(p=>p.map(x=>x.id===o.id?{...x,status:"cancelled",updatedAt:now}:x));
+                        showToast("已拒絕","error");
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            }
+          </div>
+          );
+        })()}
+
+        {/* HISTORY */}
+        {tab==="history"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {orders.length===0&&<div className="card" style={{padding:40,textAlign:"center",color:"#d4a898"}}><div style={{fontSize:36}}>📋</div><div style={{fontWeight:700,marginTop:8}}>還沒有歷程</div></div>}
+            {[...orders].reverse().map(o=>{
+              const s=STATUS[o.status];
+              return(
+                <div key={o.id} className="card" style={{overflow:"hidden"}}>
+                  {o.image&&<img src={o.image} alt="" style={{width:"100%",height:80,objectFit:"cover"}}/>}
+                  <div style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:10,background:s.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{s.icon}</div>
+                    <div style={{flex:1}}><div style={{fontWeight:800,color:"#2d1f1a",fontSize:13}}>{o.item}</div><div style={{fontSize:11,color:"#b8887a"}}>{o.clientName} · {o.updatedAt}</div></div>
+                    <span className="chip" style={{background:s.bg,color:s.color}}>{s.label}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* SETTINGS */}
+        {tab==="settings"&&<SettingsTab announce={announce} setAnnounce={setAnnounce} showToast={showToast}/>}
+      </div>
+
+      {/* 對帳明細 MODAL */}
+      {billingClient&&(()=>{
+        const c=billingClient;
+        const w=wallets[c.clientCode]||{balance:0,logs:[]};
+        const totalDep=(w.logs||[]).filter(l=>l.type==="add").reduce((s,l)=>s+l.amount,0);
+        const level=getMemberLevel(totalDep);
+        // 只計算未取消的訂單
+        const cOrders=orders.filter(o=>(o.clientCode===c.clientCode||o.clientName===c.name)&&o.status!=="cancelled");
+        // 計算每筆訂單的售價（套用會員等級）
+        const orderRows=cOrders.map(o=>{
+          const isMail=!!o.mailShipping;
+          let sell;
+          if(isMail) sell=Math.ceil(o.price*0.25)+(o.shippingFee||0);
+          else if(o.rateType==="gacha") sell=gachaTWD(o.price,o.keepShell);
+          else if(o.rateType==="ticket") sell=Math.ceil(o.price*level.ticketRate);
+          else if(o.rateType==="souvenir") sell=Math.ceil(o.price*level.souvenirRate);
+          else if(o.customRate) sell=Math.ceil(o.price*o.customRate);
+          else sell=Math.ceil(o.price*0.26);
+          // 扭蛋不給回饋，其他含郵寄都給，小金額用ceil確保至少NT$1
+          const cashback=(o.rateType!=="gacha"&&level.cashback>0)?Math.ceil(sell*level.cashback):0;
+          return {...o, sell, cashback, final:sell-cashback};
+        });
+        const totalSell=orderRows.reduce((s,o)=>s+o.sell,0);
+        const totalCashback=orderRows.reduce((s,o)=>s+o.cashback,0);
+        const totalFinal=orderRows.reduce((s,o)=>s+o.final,0);
+        return(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setBillingClient(null)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div>
+                <div style={{fontWeight:900,fontSize:18,color:"#2d1f1a"}}>📊 {c.name} 對帳明細</div>
+                <div style={{fontSize:12,color:level.color,fontWeight:700,marginTop:2}}>{level.icon}{level.name} · 回饋{level.cashback>0?`${level.cashback*100}%`:"無"}</div>
+              </div>
+              <button onClick={()=>setBillingClient(null)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+            </div>
+            {/* 明細列表 */}
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16,maxHeight:"45vh",overflowY:"auto"}}>
+              {orderRows.length===0
+                ?<div style={{textAlign:"center",padding:24,color:"#d4a898"}}>還沒有訂單</div>
+                :orderRows.map(o=>{
+                  const s=STATUS[o.status];
+                  return(
+                    <div key={o.id} style={{background:"#fffaf5",borderRadius:12,padding:"10px 14px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                        <div style={{flex:1,marginRight:8}}>
+                          <div style={{fontWeight:700,fontSize:13,color:"#2d1f1a"}}>{o.item}</div>
+                          <div style={{fontSize:11,color:"#d4a898",marginTop:2}}>{s.icon} {s.label} · {o.updatedAt}</div>
+                          {o.note&&<div style={{fontSize:11,color:"#8a6a5a",marginTop:2}}>📝 {o.note}</div>}
+                        </div>
+                        <div style={{textAlign:"right",flexShrink:0}}>
+                          <div style={{fontWeight:800,color:"#c8756a",fontSize:14}}>NT${o.sell.toLocaleString()}</div>
+                          {o.cashback>0&&<div style={{fontSize:11,color:"#16a34a",fontWeight:700}}>回饋 -NT${o.cashback}</div>}
+                          {o.mailShipping&&<div style={{fontSize:10,color:"#3b82f6",fontWeight:700}}>✈️ 郵寄 0.25</div>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              }
+            </div>
+            {/* 合計 */}
+            <div style={{background:"linear-gradient(135deg,#fff8f0,#fde8d8)",borderRadius:16,padding:"14px 16px",marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:13}}>
+                <span style={{color:"#8a6a5a"}}>商品合計</span>
+                <span style={{fontWeight:700,color:"#2d1f1a"}}>NT${totalSell.toLocaleString()}</span>
+              </div>
+              {totalCashback>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:13}}>
+                <span style={{color:"#16a34a",fontWeight:700}}>會員回饋折扣</span>
+                <span style={{fontWeight:700,color:"#16a34a"}}>-NT${totalCashback.toLocaleString()}</span>
+              </div>}
+              <div style={{display:"flex",justifyContent:"space-between",paddingTop:8,borderTop:"1.5px solid #f0d9cc"}}>
+                <span style={{fontWeight:900,color:"#2d1f1a",fontSize:15}}>實付金額</span>
+                <span style={{fontWeight:900,color:"#c8756a",fontSize:22}}>NT${totalFinal.toLocaleString()}</span>
+              </div>
+              {w.balance>0&&<div style={{marginTop:8,fontSize:12,color:"#8a6a5a",background:"#fff",borderRadius:8,padding:"6px 10px"}}>
+                💰 購物金餘額：NT${w.balance.toLocaleString()}
+                {w.balance>=totalFinal&&<span style={{color:"#22c55e",fontWeight:700,marginLeft:8}}>✅ 足夠扣款</span>}
+              </div>}
+            </div>
+            <button onClick={()=>setBillingClient(null)} className="tap btn-blue" style={{width:"100%"}}>關閉</button>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ORDER FORM */}
+      {showOF&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowOF(false)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
+              <div style={{fontWeight:900,fontSize:18,color:"#2d1f1a"}}>{editO?"✏️ 編輯訂單":"＋ 新增訂單"}</div>
+              <button onClick={()=>setShowOF(false)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+            </div>
+
+            {/* 商品圖片 */}
+            <div style={{marginBottom:14}}><label className="LS">商品圖片（選填）</label><ImgBox img={oImg.img} onPick={oImg.pick} iref={oImg.ref} onChange={oImg.onChange} label="點擊上傳商品圖片" h={130}/></div>
+
+            {/* 客人下拉 */}
+            <div style={{marginBottom:13}}>
+              <label className="LS">客人姓名 *</label>
+              <select className="IS" value={oForm.clientName} onChange={e=>{
+                const name=e.target.value;
+                const c=clients.find(x=>x.name===name);
+                setOForm(p=>({...p,clientName:name,clientCode:c?.clientCode||""}));
+              }} style={{color:oForm.clientName?"#2d1f1a":"#b8887a",fontWeight:700}}>
+                <option value="">請選擇客人</option>
+                {clients.map(c=><option key={c.clientCode} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+
+            {/* 商品名稱 */}
+            <div style={{marginBottom:13}}><label className="LS">商品名稱 *</label><input className="IS" value={oForm.item} onChange={e=>setOForm(p=>({...p,item:e.target.value}))} placeholder="例：Nike Air Max 2024"/></div>
+
+            {/* 價格幣別 */}
+            <div style={{display:"flex",gap:10,marginBottom:13}}>
+              <div style={{flex:2}}><label className="LS">價格 *</label><input className="IS" type="number" value={oForm.price} onChange={e=>setOForm(p=>({...p,price:e.target.value}))} placeholder="0"/></div>
+              <div style={{flex:1}}><label className="LS">幣別</label><select className="IS" value={oForm.currency} onChange={e=>setOForm(p=>({...p,currency:e.target.value}))} style={{color:"#c8756a",fontWeight:700}}>{CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            </div>
+
+            {/* 商品類型 */}
+            <div style={{marginBottom:13}}>
+              <label className="LS">商品類型</label>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {Object.entries(RATE_TYPES).filter(([k])=>k!=="group").map(([k,v])=>(
+                  <button key={k} onClick={()=>setOForm(p=>({...p,rateType:k}))} className="tap"
+                    style={{padding:"10px 8px",borderRadius:12,border:`2px solid ${oForm.rateType===k?v.color:"#f5e6d8"}`,background:oForm.rateType===k?v.color+"15":"#fffaf5",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                    <div style={{fontWeight:800,fontSize:12,color:oForm.rateType===k?v.color:"#8a6a5a"}}>{v.label}</div>
+                    <div style={{fontSize:11,color:"#b8887a",marginTop:2}}>{v.rate?`匯率 ${v.rate}`:"固定定價"}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 狀態 */}
+            <div style={{marginBottom:13}}><label className="LS">狀態</label><select className="IS" value={oForm.status} onChange={e=>setOForm(p=>({...p,status:e.target.value}))} style={{color:"#c8756a",fontWeight:700}}>{Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}</select></div>
+
+            {/* 備註 */}
+            <div style={{marginBottom:22}}><label className="LS">備註</label><textarea className="IS" value={oForm.note} onChange={e=>setOForm(p=>({...p,note:e.target.value}))} placeholder="尺寸、顏色等..." rows={2} style={{resize:"vertical"}}/></div>
+
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowOF(false)} className="tap btn-gray" style={{flex:1}}>取消</button>
+              <button onClick={submitO} className="tap btn-blue" style={{flex:2}}>{editO?"儲存變更":"新增訂單"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRODUCT FORM */}
+      {showPF&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowPF(false)}>
+          <div className="modal-box">
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
+              <div style={{fontWeight:900,fontSize:18,color:"#2d1f1a"}}>{editP?"✏️ 編輯商品":"＋ 新增商品"}</div>
+              <button onClick={()=>setShowPF(false)} style={{background:"#fff8f0",border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:18,color:"#b8887a"}}>×</button>
+            </div>
+            <div style={{marginBottom:16}}><label className="LS">商品圖片</label><ImgBox img={pImg.img} onPick={pImg.pick} iref={pImg.ref} onChange={pImg.onChange} label="點擊上傳商品圖片" h={150}/></div>
+            <div style={{marginBottom:13}}><label className="LS">商品名稱 *</label><input className="IS" value={pForm.name} onChange={e=>setPForm(p=>({...p,name:e.target.value}))} placeholder="例：資生堂防曬乳 SPF50"/></div>
+
+            {/* 只有扭蛋才需要填價格 */}
+            {pForm.rateType==="gacha"&&(
+              <div style={{display:"flex",gap:10,marginBottom:13}}>
+                <div style={{flex:2}}><label className="LS">扭蛋日幣定價</label><input className="IS" type="number" value={pForm.price} onChange={e=>setPForm(p=>({...p,price:e.target.value}))} placeholder="200 / 300 / 400 / 500"/></div>
+              </div>
+            )}
+
+            {/* 非扭蛋顯示提示 */}
+            {pForm.rateType!=="gacha"&&(
+              <div style={{background:"#fff8f0",border:"1.5px solid #bae6fd",borderRadius:12,padding:"10px 14px",marginBottom:13,fontSize:12,color:"#c8756a",fontWeight:600}}>
+                💡 客人下單時自行填寫現地日幣金額，業者審核後確認
+              </div>
+            )}
+
+            <div style={{marginBottom:13}}><label className="LS">分類</label><select className="IS" value={pForm.category} onChange={e=>setPForm(p=>({...p,category:e.target.value}))} style={{color:"#c8756a",fontWeight:700}}>{CATS.filter(c=>c!=="全部").map(c=><option key={c}>{c}</option>)}</select></div>
+            <div style={{marginBottom:13}}><label className="LS">商品說明</label><input className="IS" value={pForm.desc} onChange={e=>setPForm(p=>({...p,desc:e.target.value}))} placeholder="例：75ml，多色可選"/></div>
+            <div style={{marginBottom:13}}>
+              <label className="LS">商品類型（決定匯率）</label>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {Object.entries(RATE_TYPES).map(([k,v])=>(
+                  <button key={k} onClick={()=>setPForm(p=>({...p,rateType:k}))} className="tap"
+                    style={{padding:"10px 8px",borderRadius:12,border:`2px solid ${pForm.rateType===k?v.color:"#f5e6d8"}`,background:pForm.rateType===k?v.color+"15":"#fffaf5",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                    <div style={{fontWeight:800,fontSize:12,color:pForm.rateType===k?v.color:"#8a6a5a"}}>{v.label}</div>
+                    <div style={{fontSize:11,color:"#b8887a",marginTop:2}}>{k==="group"?"客人自填現地價":v.rate?`匯率 ${v.rate}`:"固定定價"}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 大項目提示 */}
+            {pForm.rateType==="group"&&(
+              <div style={{background:"#fff1f0",border:"1.5px solid #fca5a5",borderRadius:12,padding:"12px 14px",marginBottom:13}}>
+                <div style={{fontWeight:800,color:"#e11d48",fontSize:13,marginBottom:4}}>📋 大項目代購模式</div>
+                <div style={{fontSize:12,color:"#7a5c5c",lineHeight:1.6}}>
+                  客人點進去後自己填現地日幣標價<br/>
+                  系統依匯率自動換算台幣（最終由你確認）<br/>
+                  適合：吉伊卡哇、拉麵店、景點限定品等
+                </div>
+                <div style={{marginTop:10}}>
+                  <label className="LS">使用匯率</label>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+                    {[["general","一般 0.26"],["ticket","門票 0.28"],["souvenir","土產 0.27"]].map(([k,l])=>(
+                      <button key={k} onClick={()=>setPForm(p=>({...p,groupRateType:k}))} className="tap"
+                        style={{padding:"7px 4px",borderRadius:10,border:`2px solid ${pForm.groupRateType===k?RATE_TYPES[k].color:"#f5e6d8"}`,background:pForm.groupRateType===k?RATE_TYPES[k].color+"15":"#fff",cursor:"pointer",fontFamily:"inherit",textAlign:"center"}}>
+                        <div style={{fontWeight:800,fontSize:11,color:pForm.groupRateType===k?RATE_TYPES[k].color:"#8a6a5a"}}>{l}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pForm.rateType==="gacha"&&(
+              <div style={{background:"#fdf4ff",border:"1.5px solid #e9d5ff",borderRadius:14,padding:"14px",marginBottom:13}}>
+                <div style={{fontWeight:800,color:"#7e22ce",fontSize:13,marginBottom:10}}>🎰 扭蛋定價表（點選）</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                  {GACHA_PRICES.map(g=>(
+                    <div key={g.jpy} onClick={()=>setPForm(p=>({...p,price:String(g.jpy)}))} className="tap"
+                      style={{background:pForm.price===String(g.jpy)?"#a855f7":"#fff",borderRadius:10,padding:"8px 10px",border:`1.5px solid ${pForm.price===String(g.jpy)?"#a855f7":"#e9d5ff"}`,cursor:"pointer",textAlign:"center"}}>
+                      <div style={{fontWeight:900,color:pForm.price===String(g.jpy)?"#fff":"#7e22ce",fontSize:14}}>{g.jpy}¥</div>
+                      <div style={{fontWeight:700,color:pForm.price===String(g.jpy)?"rgba(255,255,255,.8)":"#a855f7",fontSize:12}}>NT${g.twd}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <button onClick={()=>setPForm(p=>({...p,keepShell:!p.keepShell}))} className="tap"
+                    style={{width:44,height:24,borderRadius:12,border:"none",cursor:"pointer",background:pForm.keepShell?"#a855f7":"#d1d5db",position:"relative",flexShrink:0}}>
+                    <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:pForm.keepShell?22:3,transition:"left .2s"}}/>
+                  </button>
+                  <span style={{fontSize:13,color:pForm.keepShell?"#7e22ce":"#b8887a",fontWeight:700}}>{pForm.keepShell?"留蛋殼（+NT$5）":"只留蛋紙"}</span>
+                </div>
+                {pForm.price&&<div style={{marginTop:10,background:"#fff",borderRadius:10,padding:"8px 12px",fontSize:13,color:"#7e22ce",fontWeight:700}}>💰 售價：NT${gachaTWD(+pForm.price,pForm.keepShell)}</div>}
+              </div>
+            )}
+            {pForm.rateType!=="gacha"&&(
+              <div style={{marginBottom:13}}>
+                <label className="LS">自訂匯率（選填，覆蓋類型匯率）</label>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <input className="IS" type="number" step="0.001" value={pForm.customRate} onChange={e=>setPForm(p=>({...p,customRate:e.target.value}))} placeholder={`預設 ${RATE_TYPES[pForm.rateType]?.rate||0.26}`} style={{flex:1}}/>
+                  {pForm.customRate&&<span style={{color:"#b5622e",fontWeight:700,fontSize:13,whiteSpace:"nowrap"}}>= NT${pForm.price?Math.ceil(+pForm.price*(+pForm.customRate)).toLocaleString():"?"}</span>}
+                </div>
+              </div>
+            )}
+            <div style={{marginBottom:22,display:"flex",alignItems:"center",gap:12}}>
+              <label style={{fontSize:13,fontWeight:800,color:"#374151"}}>上架販售</label>
+              <button onClick={()=>setPForm(p=>({...p,inStock:!p.inStock}))} className="tap"
+                style={{width:52,height:28,borderRadius:14,border:"none",cursor:"pointer",background:pForm.inStock?"#c8756a":"#d1d5db",position:"relative"}}>
+                <div style={{width:22,height:22,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:pForm.inStock?26:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.2)"}}/>
+              </button>
+              <span style={{fontSize:13,color:pForm.inStock?"#22c55e":"#94a3b8",fontWeight:700}}>{pForm.inStock?"販售中":"已下架"}</span>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowPF(false)} className="tap btn-gray" style={{flex:1}}>取消</button>
+              <button onClick={submitP} className="tap btn-blue" style={{flex:2}}>{editP?"儲存變更":"新增商品"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══ ROOT ═════════════════════════════════════
+function App(){
+  const [screen,setScreen]=useState("home");
+  const [loggedIn,setLoggedIn]=useState(false);
+  const [loading,setLoading]=useState(true);
+
+  // State starts empty, Firebase listeners will populate
+  const [orders,setOrdersR]    =useState([]);
+  const [clients,setClientsR]  =useState([]);
+  const [products,setProductsR]=useState([]);
+  const [sellRates,setSellRatesR] =useState(SELL_RATES0);
+  const [wallets,setWalletsR]     =useState({});
+  const [wishlists,setWishlistsR] =useState({});
+  const [pending,setPendingR]     =useState([]);
+  const [announce,setAnnounceR]   =useState({title:"歡迎使用代購管理系統",body:"即時追蹤每筆訂單的購買狀態！"});
+  const [stockItems,setStockItemsR]=useState([]);
+  const [liveRates,setLiveRates]  =useState(BASE_RATES);
+
+  // ── Firebase write helpers ──────────────────
+  function fbSave(col, data){ db.collection("shopdata").doc(col).set({data:JSON.stringify(data)}); }
+
+  function setOrders(v)   { const nv=typeof v==="function"?v(orders):v;    setOrdersR(nv);    fbSave("orders",nv); }
+  function setClients(v)  { const nv=typeof v==="function"?v(clients):v;   setClientsR(nv);   fbSave("clients",nv); }
+  function setProducts(v) { const nv=typeof v==="function"?v(products):v;  setProductsR(nv);  fbSave("products",nv); }
+  function setSellRates(v){ const nv=typeof v==="function"?v(sellRates):v; setSellRatesR(nv); fbSave("sellRates",nv); }
+  function setWallets(v)  { const nv=typeof v==="function"?v(wallets):v;   setWalletsR(nv);   fbSave("wallets",nv); }
+  function setWishlists(v){ const nv=typeof v==="function"?v(wishlists):v; setWishlistsR(nv); fbSave("wishlists",nv); }
+  function setPending(v)  { const nv=typeof v==="function"?v(pending):v;   setPendingR(nv);   fbSave("pending",nv); }
+  function setAnnounce(v) { const nv=typeof v==="function"?v(announce):v;  setAnnounceR(nv);  fbSave("announce",nv); }
+  function setStockItems(v){ const nv=typeof v==="function"?v(stockItems):v; setStockItemsR(nv); fbSave("stockItems",nv); }
+
+  // ── Firebase real-time listeners ────────────
+  useEffect(()=>{
+    const keys=["orders","clients","products","sellRates","wallets","wishlists","pending","announce","stockItems"];
+    const setters={orders:setOrdersR,clients:setClientsR,products:setProductsR,sellRates:setSellRatesR,wallets:setWalletsR,wishlists:setWishlistsR,pending:setPendingR,announce:setAnnounceR,stockItems:setStockItemsR};
+    const unsubs=keys.map(key=>
+      db.collection("shopdata").doc(key).onSnapshot(snap=>{
+        if(snap.exists){
+          try{
+            const data=JSON.parse(snap.data().data);
+            setters[key](data);
+            save(key,data);
+          }catch(e){}
+        }
+        setLoading(false);
+      },()=>setLoading(false))
+    );
+    // Also stop loading after 3s even if Firebase is slow
+    const t=setTimeout(()=>setLoading(false),3000);
+    return ()=>{ unsubs.forEach(u=>u()); clearTimeout(t); };
+  },[]);
+
+  // ── Live exchange rate ticker ────────────────
+  useEffect(()=>{
+    // 成本匯率固定，不隨機浮動
+    // const id=setInterval(...)  已移除
+    return ()=>{};
+  },[]);
+
+  if(loading) return(
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"linear-gradient(160deg,#fdf6ee,#fff8f0,#fef3e8)"}}>
+      <div style={{fontSize:56,marginBottom:16}}>🛍️</div>
+      <div style={{fontWeight:900,fontSize:20,color:"#2d1f1a",marginBottom:8}}>ShopTrack</div>
+      <div style={{fontSize:14,color:"#b8887a",marginBottom:24}}>正在連接雲端資料...</div>
+      <div style={{width:48,height:48,border:"4px solid #f0d9cc",borderTopColor:"#c8756a",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+
+  if(screen==="home") return <Home onAgent={()=>setScreen("agent")} onClient={()=>setScreen("client")} announce={announce}/>;
+  if(screen==="client") return <ClientView orders={orders} setOrders={setOrders} clients={clients} setClients={setClients} products={products} sellRates={sellRates} wallets={wallets} setWallets={setWallets} wishlists={wishlists} setWishlists={setWishlists} pending={pending} setPending={setPending} announce={announce} stockItems={stockItems} setStockItems={setStockItems} onBack={()=>setScreen("home")}/>;
+  if(screen==="agent"&&!loggedIn) return <AgentLogin onLogin={()=>setLoggedIn(true)} onBack={()=>setScreen("home")}/>;
+  return <AgentDash orders={orders} setOrders={setOrders} clients={clients} setClients={setClients} products={products} setProducts={setProducts} onLogout={()=>{setLoggedIn(false);setScreen("home");}} liveRates={liveRates} sellRates={sellRates} setSellRates={setSellRates} wallets={wallets} setWallets={setWallets} wishlists={wishlists} setWishlists={setWishlists} pending={pending} setPending={setPending} announce={announce} setAnnounce={setAnnounce} stockItems={stockItems} setStockItems={setStockItems}/>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
