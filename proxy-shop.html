@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShopTrack 代購管理系統</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Microsoft JhengHei', sans-serif; background: #faf8f5; color: #2d1f1a; }
+    .container { max-width: 500px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+    .card { background: white; border-radius: 16px; padding: 16px; margin: 12px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .btn { padding: 12px 16px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 14px; font-family: inherit; }
+    .btn-primary { background: linear-gradient(135deg, #7cb87a, #9ed09c); color: white; width: 100%; margin: 8px 0; }
+    .btn-secondary { background: #f5f5f5; color: #666; width: 100%; margin: 8px 0; }
+    .btn-small { padding: 6px 12px; width: auto; font-size: 12px; margin: 4px 4px 4px 0; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin: 8px 0; font-size: 14px; font-family: inherit; }
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .modal-content { background: white; max-width: 500px; margin: 40px auto; border-radius: 16px; padding: 20px; max-height: 90vh; overflow-y: auto; }
+    .modal.show { display: flex; align-items: flex-start; justify-content: center; }
+    .tabs { display: flex; gap: 8px; margin: 12px 0; background: #fffaf5; padding: 8px; border-radius: 12px; }
+    .tab-btn { flex: 1; padding: 10px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; background: transparent; color: #8a6a5a; }
+    .tab-btn.active { background: #c8756a; color: white; }
+    .hide { display: none !important; }
+    .status-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+    th { font-weight: bold; background: #fffaf5; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal" class="modal"><div class="modal-content"><div id="modal-body"></div></div></div>
+
+<script>
+const LSK = k => `shoptrack_${k}`;
+const load = (k, d) => { try { const v = localStorage.getItem(LSK(k)); return v ? JSON.parse(v) : d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(LSK(k), JSON.stringify(v)); } catch(e) { alert('儲存失敗'); } };
+
+let state = {screen:'login',nick:'',orders:load('orders',[]),clients:load('clients',[]),wallets:load('wallets',{}),products:load('products',[]),tab:'orders'};
+
+function saveState(){save('orders',state.orders);save('clients',state.clients);save('wallets',state.wallets);save('products',state.products);}
+
+function getMemberLevel(dep){if(dep>=6000)return{name:"鑽石優惠",cashback:0.02,ticketRate:0.285,souvenirRate:0.275,icon:"💎"};if(dep>=4000)return{name:"黃金優惠",cashback:0.01,ticketRate:0.285,souvenirRate:0.285,icon:"🥇"};if(dep>=2000)return{name:"銀牌優惠",cashback:0.01,ticketRate:0.295,souvenirRate:0.285,icon:"🥈"};return{name:"無優惠",cashback:0,ticketRate:0.295,souvenirRate:0.285,icon:"👤"};}
+
+function productPrice(p,level){if(p.rateType==='gacha'){const prices=[{jpy:200,twd:60},{jpy:300,twd:80},{jpy:400,twd:110},{jpy:500,twd:140}];const r=prices.find(x=>x.jpy===+p.jpy);return(r?r.twd:Math.round(p.jpy*0.275))+(p.keepShell?5:0);}if(p.rateType==='ticket')return Math.ceil(p.price*(level?level.ticketRate:0.295));if(p.rateType==='souvenir')return Math.ceil(p.price*(level?level.souvenirRate:0.285));return Math.ceil(p.price*0.275);}
+
+function openModal(html){document.getElementById('modal-body').innerHTML=html;document.getElementById('modal').classList.add('show');}
+
+function closeModal(){document.getElementById('modal').classList.remove('show');}
+
+function render(){const app=document.getElementById('app');if(state.screen==='login'){app.innerHTML=`<div class="container" style="text-align:center;padding-top:80px;"><div style="font-size:48px;margin-bottom:20px;">🛍️</div><h1 style="margin-bottom:40px;">ShopTrack</h1><button class="btn btn-primary" onclick="state.screen='agent';state.tab='orders';render();">👑 闆闆登入</button><button class="btn btn-secondary" onclick="state.screen='client-login';render();">👤 客人登入</button></div>`;}else if(state.screen==='client-login'){app.innerHTML=`<div class="container" style="text-align:center;padding-top:60px;"><h2 style="margin-bottom:30px;">客人登入</h2><input id="cname" placeholder="輸入你的名字"/><button class="btn btn-primary" onclick="loginClient()">進入</button><button class="btn btn-secondary" onclick="state.screen='login';render();">返回</button></div>`;setTimeout(()=>document.getElementById('cname')?.focus(),100);}else if(state.screen==='client'){const c=state.clients.find(x=>x.name===state.nick);const w=state.wallets[c?.clientCode]||{balance:0,logs:[]};const myOrders=state.orders.filter(o=>o.clientName===state.nick);const totalDep=(w.logs||[]).filter(l=>l.type==='add').reduce((s,l)=>s+l.amount,0);const level=getMemberLevel(totalDep);let html=`<div class="container"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h2>${state.nick}</h2><button class="btn btn-secondary btn-small" onclick="state.screen='login';render();">登出</button></div>`;const total=myOrders.reduce((s,o)=>s+productPrice(o,level),0);const cashback=level.cashback>0?Math.ceil(myOrders.filter(o=>o.rateType!=='gacha').reduce((s,o)=>s+productPrice(o,level),0)*level.cashback):0;const finalTotal=total-cashback;html+=`<div class="card" style="background:linear-gradient(135deg,#fff8f0,#fde8d8);"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span>📦 商品合計</span><span style="font-weight:bold;">NT$${total.toLocaleString()}</span></div>`;if(cashback>0)html+=`<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span>${level.icon} 會員回饋</span><span style="color:#22c55e;font-weight:bold;">-NT$${cashback}</span></div>`;html+=`<div style="display:flex;justify-content:space-between;margin-bottom:8px;padding-top:8px;border-top:1px solid #f0d9cc;"><span>小計</span><span style="font-weight:bold;">NT$${finalTotal.toLocaleString()}</span></div><div style="display:flex;justify-content:space-between;"><span>💰 購物金</span><span style="font-weight:bold;">NT$${w.balance}</span></div><div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #f0d9cc;"><span style="font-weight:bold;">應付</span><span style="font-weight:bold;color:#e11d48;font-size:18px;">NT$${Math.max(0,finalTotal-w.balance)}</span></div></div>`;html+=`<div class="card"><h3>訂單 (${myOrders.length})</h3>`;if(myOrders.length===0){html+=`<div style="text-align:center;color:#999;padding:20px;">還沒有訂單</div>`;}else{myOrders.forEach(o=>{const price=productPrice(o,level);html+=`<div style="padding:10px;background:#fffaf5;border-radius:8px;margin-top:8px;"><div><strong>${o.item}</strong></div><div style="font-size:12px;color:#666;">NT$${price} | ${o.status}</div></div>`;}); }html+=`</div></div>`;app.innerHTML=html;}else if(state.screen==='agent'){let html=`<div class="container"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h2>👑 業者</h2><button class="btn btn-secondary btn-small" onclick="state.screen='login';render();">登出</button></div>`;html+=`<div class="tabs"><button class="tab-btn ${state.tab==='orders'?'active':''}" onclick="state.tab='orders';render();">📋 訂單</button><button class="tab-btn ${state.tab==='products'?'active':''}" onclick="state.tab='products';render();">📦 商品</button><button class="tab-btn ${state.tab==='clients'?'active':''}" onclick="state.tab='clients';render();">👤 客人</button></div>`;if(state.tab==='orders'){html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><h3>訂單 (${state.orders.length})</h3><button class="btn btn-primary btn-small" onclick="addOrderModal()">+ 新增</button></div>`;if(state.orders.length===0){html+=`<div style="text-align:center;color:#999;padding:20px;">沒有訂單</div>`;}else{html+=`<table><tr><th>客人</th><th>商品</th><th>狀態</th><th>操作</th></tr>`;state.orders.forEach(o=>{const statusColor={pending:'#f59e0b',bought:'#22c55e',completed:'#0f766e'}[o.status]||'#666';html+=`<tr><td>${o.clientName}</td><td>${o.item}</td><td><span class="status-badge" style="background:${statusColor}20;color:${statusColor};">${o.status}</span></td><td><button class="btn btn-primary btn-small" onclick="editOrderModal('${o.id}')">編輯</button></td></tr>`;});html+=`</table>`;}html+=`</div>`;}if(state.tab==='products'){html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><h3>商品 (${state.products.length})</h3><button class="btn btn-primary btn-small" onclick="addProductModal()">+ 新增</button></div>`;if(state.products.length===0){html+=`<div style="text-align:center;color:#999;padding:20px;">沒有商品</div>`;}else{state.products.forEach(p=>{html+=`<div style="padding:10px;background:#fffaf5;border-radius:8px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;"><div><div><strong>${p.name}</strong></div><div style="font-size:12px;color:#666;">¥${p.price} → NT$${productPrice({...p,rateType:'general'},{})} </div></div><div><button class="btn btn-primary btn-small" onclick="editProductModal('${p.id}')">編輯</button><button class="btn btn-secondary btn-small" onclick="deleteProduct('${p.id}')">刪</button></div></div>`;}); }html+=`</div>`;}if(state.tab==='clients'){html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><h3>客人 (${state.clients.length})</h3><button class="btn btn-primary btn-small" onclick="addClientModal()">+ 新增</button></div>`;if(state.clients.length===0){html+=`<div style="text-align:center;color:#999;padding:20px;">沒有客人</div>`;}else{state.clients.forEach(c=>{const w=state.wallets[c.clientCode]||{balance:0};html+=`<div style="padding:10px;background:#fffaf5;border-radius:8px;margin-top:8px;"><div><strong>${c.name}</strong></div><div style="font-size:12px;color:#666;">購物金:NT$${w.balance} | <button class="btn btn-primary btn-small" onclick="walletModal('${c.clientCode}')">管理</button></div></div>`; }); }html+=`</div>`;}html+=`</div>`;app.innerHTML=html;}}
+
+function loginClient(){const name=document.getElementById('cname')?.value.trim();if(!name){alert('請輸入名字');return;}const c=state.clients.find(x=>x.name===name);if(!c){alert('找不到此客人');return;}state.nick=name;state.screen='client';render();}
+
+function addClientModal(){openModal(`<h3>新增客人</h3><input id="newClientName" placeholder="客人名字"/><button class="btn btn-primary" onclick="addClient()">新增</button><button class="btn btn-secondary" onclick="closeModal()">取消</button>`);}
+
+function addClient(){const name=document.getElementById('newClientName')?.value.trim();if(!name){alert('請輸入名字');return;}const code=`C${Date.now()}`;state.clients.push({name,clientCode:code});state.wallets[code]={balance:0,logs:[]};saveState();closeModal();render();}
+
+function addProductModal(){openModal(`<h3>新增商品</h3><input id="prodName" placeholder="商品名稱"/><input id="prodPrice" placeholder="日幣價格" type="number"/><select id="prodType"><option value="general">一般商品 (0.275)</option><option value="ticket">門票商品 (0.295)</option><option value="souvenir">土產/大型 (0.285)</option><option value="gacha">扭蛋</option></select><button class="btn btn-primary" onclick="addProduct()">新增</button><button class="btn btn-secondary" onclick="closeModal()">取消</button>`);}
+
+function addProduct(){const name=document.getElementById('prodName')?.value.trim();const price=+document.getElementById('prodPrice')?.value;const rateType=document.getElementById('prodType')?.value;if(!name||!price){alert('請填完整');return;}state.products.push({id:'P'+Date.now(),name,price,rateType});saveState();closeModal();render();}
+
+function editProductModal(id){const p=state.products.find(x=>x.id===id);openModal(`<h3>編輯商品</h3><input id="editProdName" value="${p.name}"/><input id="editProdPrice" value="${p.price}" type="number"/><select id="editProdType"><option value="general" ${p.rateType==='general'?'selected':''}>一般商品</option><option value="ticket" ${p.rateType==='ticket'?'selected':''}>門票商品</option><option value="souvenir" ${p.rateType==='souvenir'?'selected':''}>土產/大型</option><option value="gacha" ${p.rateType==='gacha'?'selected':''}>扭蛋</option></select><button class="btn btn-primary" onclick="updateProduct('${id}')">儲存</button><button class="btn btn-secondary" onclick="closeModal()">取消</button>`);}
+
+function updateProduct(id){const name=document.getElementById('editProdName')?.value.trim();const price=+document.getElementById('editProdPrice')?.value;const rateType=document.getElementById('editProdType')?.value;const p=state.products.find(x=>x.id===id);p.name=name;p.price=price;p.rateType=rateType;saveState();closeModal();render();}
+
+function deleteProduct(id){if(!confirm('確定刪除?'))return;state.products=state.products.filter(x=>x.id!==id);saveState();render();}
+
+function addOrderModal(){openModal(`<h3>新增訂單</h3><select id="orderClient"><option value="">選擇客人</option>${state.clients.map(c=>`<option value="${c.clientCode}">${c.name}</option>`).join('')}</select><select id="orderProduct"><option value="">選擇商品</option>${state.products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select><input id="orderPrice" placeholder="日幣價格" type="number"/><select id="orderStatus"><option value="pending">待購買</option><option value="bought">已買到</option><option value="completed">已完成</option></select><button class="btn btn-primary" onclick="addOrder()">新增</button><button class="btn btn-secondary" onclick="closeModal()">取消</button>`);}
+
+function addOrder(){const clientCode=document.getElementById('orderClient')?.value;const productId=document.getElementById('orderProduct')?.value;const price=+document.getElementById('orderPrice')?.value;const status=document.getElementById('orderStatus')?.value;if(!clientCode||!productId||!price){alert('請填完整');return;}const c=state.clients.find(x=>x.clientCode===clientCode);const p=state.products.find(x=>x.id===productId);state.orders.push({id:'O'+Date.now(),clientName:c.name,clientCode:clientCode,item:p.name,price:price,rateType:p.rateType,status:status,updatedAt:new Date().toLocaleDateString('zh-TW')});saveState();closeModal();render();}
+
+function editOrderModal(id){const o=state.orders.find(x=>x.id===id);openModal(`<h3>編輯訂單</h3><input value="${o.item}" disabled/><select id="editOrderStatus"><option value="pending" ${o.status==='pending'?'selected':''}>待購買</option><option value="bought" ${o.status==='bought'?'selected':''}>已買到</option><option value="completed" ${o.status==='completed'?'selected':''}>已完成</option></select><button class="btn btn-primary" onclick="updateOrder('${id}')">儲存</button><button class="btn btn-secondary" onclick="deleteOrder('${id}')">刪除</button><button class="btn btn-secondary" onclick="closeModal()">取消</button>`);}
+
+function updateOrder(id){const status=document.getElementById('editOrderStatus')?.value;const o=state.orders.find(x=>x.id===id);o.status=status;o.updatedAt=new Date().toLocaleDateString('zh-TW');saveState();closeModal();render();}
+
+function deleteOrder(id){if(!confirm('確定刪除?'))return;state.orders=state.orders.filter(x=>x.id!==id);saveState();closeModal();render();}
+
+function walletModal(clientCode){const c=state.clients.find(x=>x.clientCode===clientCode);const w=state.wallets[clientCode]||{balance:0,logs:[]};openModal(`<h3>💰 ${c.name} 購物金</h3><div style="padding:12px;background:#fffaf5;border-radius:8px;margin-bottom:12px;"><div>現有餘額: <strong style="font-size:18px;color:#c8756a;">NT$${w.balance}</strong></div></div><input id="addAmount" placeholder="輸入金額" type="number"/><button class="btn btn-primary" onclick="addBalance('${clientCode}')">+ 儲值</button><button class="btn btn-secondary" onclick="deductBalance('${clientCode}')">- 扣款</button><button class="btn btn-secondary" onclick="closeModal()">關閉</button>`);}
+
+function addBalance(clientCode){const amount=+document.getElementById('addAmount')?.value;if(!amount){alert('請輸入金額');return;}if(!state.wallets[clientCode])state.wallets[clientCode]={balance:0,logs:[]};state.wallets[clientCode].balance+=amount;state.wallets[clientCode].logs=state.wallets[clientCode].logs||[];state.wallets[clientCode].logs.push({type:'add',amount,date:new Date().toLocaleDateString('zh-TW')});saveState();walletModal(clientCode);}
+
+function deductBalance(clientCode){const amount=+document.getElementById('addAmount')?.value;if(!amount){alert('請輸入金額');return;}if(!state.wallets[clientCode])state.wallets[clientCode]={balance:0,logs:[]};state.wallets[clientCode].balance-=amount;state.wallets[clientCode].logs=state.wallets[clientCode].logs||[];state.wallets[clientCode].logs.push({type:'deduct',amount,date:new Date().toLocaleDateString('zh-TW')});saveState();walletModal(clientCode);}
+
+render();
+</script>
+</body>
+</html>
